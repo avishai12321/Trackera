@@ -1,0 +1,20 @@
+{
+  "name": "time-tracker-saas",
+  "version": "1.0.0",
+  "description": "Multi-tenant Time Tracking SaaS",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "prettier": "^3.0.0",
+    "eslint": "^8.0.0"
+  }
+}

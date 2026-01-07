@@ -1,0 +1,83 @@
+@import '../styles/variables';
+
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    background: white;
+    border-right: 1px solid $slate-200;
+    display: flex;
+    flex-direction: column;
+    padding: $spacing-6;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 50;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: $spacing-3;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: $primary-600;
+    margin-bottom: $spacing-8;
+
+    .logoIcon {
+        width: 32px;
+        height: 32px;
+        background: $gradient-primary;
+        border-radius: $radius-md;
+    }
+}
+
+.nav {
+    display: flex;
+    flex-direction: column;
+    gap: $spacing-2;
+    flex: 1;
+}
+
+.link {
+    display: flex;
+    align-items: center;
+    gap: $spacing-3;
+    padding: $spacing-3 $spacing-4;
+    border-radius: $radius-md;
+    color: $slate-500;
+    font-weight: 500;
+    transition: $transition-base;
+
+    &:hover {
+        background: $slate-50;
+        color: $slate-900;
+    }
+
+    &.active {
+        background: $primary-50;
+        color: $primary-600;
+    }
+}
+
+.footer {
+    border-top: 1px solid $slate-100;
+    padding-top: $spacing-4;
+}
+
+.logoutBtn {
+    display: flex;
+    align-items: center;
+    gap: $spacing-3;
+    width: 100%;
+    padding: $spacing-3 $spacing-4;
+    background: transparent;
+    color: $slate-500;
+    font-weight: 500;
+    border-radius: $radius-md;
+    transition: $transition-base;
+
+    &:hover {
+        background: #fee2e2;
+        color: $danger;
+    }
+}

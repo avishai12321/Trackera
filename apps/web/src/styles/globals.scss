@@ -1,0 +1,159 @@
+@import 'variables';
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif; // Will configure in layout.tsx
+    background-color: $bg-body;
+    color: $slate-800;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: $slate-900;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+    transition: $transition-base;
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+}
+
+ul {
+    list-style: none;
+}
+
+// Utility Classes
+.container {
+    max-width: 1200px; // Standard container
+    margin: 0 auto;
+    padding: 0 $spacing-6;
+}
+
+.card {
+    background: $bg-surface;
+    border-radius: $radius-lg;
+    border: 1px solid $slate-200;
+    box-shadow: $shadow-sm;
+    padding: $spacing-6;
+    transition: $transition-base;
+
+    &:hover {
+        box-shadow: $shadow-md;
+    }
+}
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-2 $spacing-4;
+    border-radius: $radius-md;
+    font-weight: 500;
+    transition: $transition-base;
+    font-size: 0.875rem;
+    gap: $spacing-2;
+
+    &-primary {
+        background: $gradient-primary;
+        color: white;
+        box-shadow: $shadow-sm;
+
+        &:hover {
+            box-shadow: $shadow-glow;
+            transform: translateY(-1px);
+        }
+    }
+
+    &-secondary {
+        background: white;
+        border: 1px solid $slate-200;
+        color: $slate-700;
+
+        &:hover {
+            background: $slate-50;
+            border-color: $slate-300;
+        }
+    }
+
+    &-danger {
+        background: #fee2e2;
+        color: $danger;
+
+        &:hover {
+            background: #fecaca;
+        }
+    }
+}
+
+// Table Styles
+.table-container {
+    overflow-x: auto;
+    border-radius: $radius-lg;
+    border: 1px solid $slate-200;
+    background: white;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th {
+        background: $slate-50;
+        color: $slate-500;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        padding: $spacing-3 $spacing-6;
+        text-align: left;
+    }
+
+    td {
+        padding: $spacing-4 $spacing-6;
+        border-top: 1px solid $slate-100;
+        color: $slate-700;
+        font-size: 0.875rem;
+    }
+
+    tr:hover td {
+        background: $slate-50;
+    }
+}
+
+// Inputs
+input,
+select,
+textarea {
+    width: 100%;
+    padding: $spacing-2 $spacing-3;
+    border: 1px solid $slate-200;
+    border-radius: $radius-md;
+    background: white;
+    font-size: 0.875rem;
+    color: $slate-800;
+    transition: $transition-base;
+
+    &:focus {
+        outline: none;
+        border-color: $primary-500;
+        box-shadow: 0 0 0 2px $primary-100;
+    }
+}
