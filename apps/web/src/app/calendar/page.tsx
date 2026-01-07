@@ -21,7 +21,7 @@ function CalendarContent() {
 
     useEffect(() => {
         if (status === 'success') {
-            alert('Calendar connected successfully!');
+            alert('Calendar connected successfully!!');
             router.replace('/calendar');
         }
     }, [status, router]);
