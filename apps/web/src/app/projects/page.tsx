@@ -1,11 +1,10 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useRouter } from 'next/navigation';
-
 import DashboardLayout from '../../components/DashboardLayout';
 import { FolderPlus, Trash2, Plus } from 'lucide-react';
+import { supabase, getCompanySchema, insertCompanyTable, deleteCompanyTable } from '@/lib/supabase';
 
 export default function Projects() {
     const router = useRouter();
@@ -21,17 +20,20 @@ export default function Projects() {
     }, []);
 
     const fetchData = async () => {
-        const token = localStorage.getItem('accessToken');
-        const tenantId = localStorage.getItem('tenantId');
-        if (!token) return router.push('/login');
-
         try {
-            const res = await axios.get('http://localhost:3000/projects', {
-                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
-            });
-            setProjects(res.data);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return router.push('/login');
+
+            const schema = await getCompanySchema();
+            const { data, error } = await supabase
+                .from(`${schema}.projects`)
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setProjects(data || []);
         } catch (err: any) {
-            if (err.response?.status === 401) router.push('/login');
+            console.error('Error fetching projects:', err);
         } finally {
             setLoading(false);
         }
@@ -40,42 +42,36 @@ export default function Projects() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
-        const token = localStorage.getItem('accessToken');
-        const tenantId = localStorage.getItem('tenantId');
 
         try {
-            await axios.post('http://localhost:3000/projects', {
-                name,
-                code,
-                description
-            }, {
-                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
+            const { error } = await insertCompanyTable('projects', {
+                project_name: name,
+                project_code: code,
+                description,
+                status: 'active',
+                budget: 0
             });
+
+            if (error) throw error;
+
             setName('');
             setCode('');
             setDescription('');
             fetchData();
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to create project');
+            setError(err.message || 'Failed to create project');
         }
     };
 
     const handleDelete = async (id: string) => {
         if (!confirm('Delete project?')) return;
-        const token = localStorage.getItem('accessToken');
-        const tenantId = localStorage.getItem('tenantId');
 
         try {
-            await axios.delete(`http://localhost:3000/projects/${id}`, {
-                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
-            });
+            const { error } = await deleteCompanyTable('projects', id);
+            if (error) throw error;
             fetchData();
         } catch (err: any) {
-            if (err.response?.data?.code === 'P2003' || err.response?.status === 500) {
-                alert('Cannot delete project: it may have associated time entries.');
-            } else {
-                alert('Delete failed');
-            }
+            alert('Cannot delete project: it may have associated time entries.');
         }
     };
 
@@ -129,16 +125,16 @@ export default function Projects() {
                         <tbody>
                             {projects.map((p: any) => (
                                 <tr key={p.id}>
-                                    <td style={{ fontWeight: 500 }}>{p.name}</td>
-                                    <td><span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{p.code}</span></td>
-                                    <td>{p.description}</td>
+                                    <td style={{ fontWeight: 500 }}>{p.project_name}</td>
+                                    <td><span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>{p.project_code}</span></td>
+                                    <td>{p.description || '-'}</td>
                                     <td>
                                         <span style={{
                                             padding: '2px 8px',
                                             borderRadius: '999px',
                                             fontSize: '0.75rem',
-                                            background: '#dbeafe',
-                                            color: '#1e40af'
+                                            background: p.status === 'active' ? '#dbeafe' : '#fef3c7',
+                                            color: p.status === 'active' ? '#1e40af' : '#92400e'
                                         }}>
                                             {p.status}
                                         </span>

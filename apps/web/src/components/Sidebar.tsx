@@ -2,10 +2,11 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Clock, Calendar, FileText, FolderKanban, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Clock, Calendar, FileText, FolderKanban, Settings, LogOut, Upload, FileCheck } from 'lucide-react';
 import styles from './Sidebar.module.scss';
 import clsx from 'clsx';
 import { useRouter } from 'next/navigation';
+import { signOut } from '@/lib/supabase';
 
 const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
@@ -13,15 +14,24 @@ const menuItems = [
     { name: 'Calendar', icon: Calendar, href: '/calendar' },
     { name: 'Reports', icon: FileText, href: '/reports' },
     { name: 'Projects', icon: FolderKanban, href: '/projects' },
+    { name: 'Import Data', icon: Upload, href: '/import' },
+    { name: 'Draft Records', icon: FileCheck, href: '/drafts' },
 ];
 
 export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
 
-    const handleLogout = () => {
-        localStorage.clear();
-        router.push('/login');
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            localStorage.clear();
+            router.push('/login');
+        } catch (err) {
+            console.error('Logout error:', err);
+            localStorage.clear();
+            router.push('/login');
+        }
     };
 
     return (

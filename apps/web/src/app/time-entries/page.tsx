@@ -1,16 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useRouter } from 'next/navigation';
-
 import DashboardLayout from '../../components/DashboardLayout';
 import { Plus, Trash2 } from 'lucide-react';
+import { supabase, getCompanySchema, getCurrentUser, insertCompanyTable, deleteCompanyTable } from '@/lib/supabase';
 
 export default function TimeEntries() {
     const router = useRouter();
     const [entries, setEntries] = useState([]);
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     // Form State
     const [description, setDescription] = useState('');
@@ -24,24 +24,42 @@ export default function TimeEntries() {
     }, []);
 
     const fetchData = async () => {
-        const token = localStorage.getItem('accessToken');
-        const tenantId = localStorage.getItem('tenantId');
-        if (!token) {
-            router.push('/login');
-            return;
-        }
-
         try {
-            const config = { headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId } };
-            const [pRes, eRes] = await Promise.all([
-                axios.get('http://localhost:3000/projects', config),
-                axios.get('http://localhost:3000/time-entries', config)
-            ]);
-            setProjects(pRes.data);
-            setEntries(eRes.data);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                router.push('/login');
+                return;
+            }
+
+            const schema = await getCompanySchema();
+            const user = await getCurrentUser();
+            setCurrentUserId(user?.dbUser?.id || null);
+
+            // Fetch projects
+            const { data: projectsData } = await supabase
+                .from(`${schema}.projects`)
+                .select('*')
+                .eq('status', 'active')
+                .order('project_name');
+
+            // Fetch time entries with related data
+            const { data: entriesData } = await supabase
+                .from(`${schema}.time_entries`)
+                .select(`
+                    id,
+                    description,
+                    start_time,
+                    duration_minutes,
+                    is_billable,
+                    project:project_id (id, project_name),
+                    user:user_id (id, first_name, last_name)
+                `)
+                .order('start_time', { ascending: false });
+
+            setProjects(projectsData || []);
+            setEntries(entriesData || []);
         } catch (err: any) {
-            if (err.response?.status === 401) router.push('/login');
-            console.error(err);
+            console.error('Error fetching data:', err);
         } finally {
             setLoading(false);
         }
@@ -49,49 +67,40 @@ export default function TimeEntries() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const token = localStorage.getItem('accessToken');
-        const tenantId = localStorage.getItem('tenantId');
 
-        // Use user's employeeId if needed, but backend handles "Self" creation if missing? 
-        // Wait, Controller throws if mismatch or missing?
-        // Let's get employeeId from localStorage user object
-        const userStr = localStorage.getItem('user');
-        const user = userStr ? JSON.parse(userStr) : null;
-
-        if (!user?.employeeId) {
-            alert('No employee ID found for user');
+        if (!currentUserId) {
+            alert('User not found');
             return;
         }
 
         try {
-            await axios.post('http://localhost:3000/time-entries', {
-                projectId,
+            const { error } = await insertCompanyTable('time_entries', {
+                user_id: currentUserId,
+                project_id: projectId,
                 description,
-                startTime: new Date(startTime).toISOString(),
-                durationMinutes: parseInt(duration),
-                billable: isBillable,
-                employeeId: user.employeeId
-            }, {
-                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
+                start_time: new Date(startTime).toISOString(),
+                duration_minutes: parseInt(duration),
+                is_billable: isBillable
             });
+
+            if (error) throw error;
 
             // Reset form and reload
             setDescription('');
             setDuration('');
+            setStartTime('');
+            setProjectId('');
             fetchData();
         } catch (err: any) {
-            alert(err.response?.data?.message || 'Failed to create entry');
+            alert(err.message || 'Failed to create entry');
         }
     };
 
     const handleDelete = async (id: string) => {
         if (!confirm('Delete entry?')) return;
-        const token = localStorage.getItem('accessToken');
-        const tenantId = localStorage.getItem('tenantId');
         try {
-            await axios.delete(`http://localhost:3000/time-entries/${id}`, {
-                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
-            });
+            const { error } = await deleteCompanyTable('time_entries', id);
+            if (error) throw error;
             fetchData();
         } catch (err) {
             alert('Delete failed');
@@ -119,7 +128,7 @@ export default function TimeEntries() {
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Project</label>
                             <select value={projectId} onChange={e => setProjectId(e.target.value)} required>
                                 <option value="">Select Project</option>
-                                {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                {projects.map((p: any) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
                             </select>
                         </div>
                         <div>
@@ -167,19 +176,19 @@ export default function TimeEntries() {
                         <tbody>
                             {entries.map((e: any) => (
                                 <tr key={e.id}>
-                                    <td>{new Date(e.date).toLocaleDateString()}</td>
-                                    <td style={{ fontWeight: 500, color: '#4f46e5' }}>{e.project?.name}</td>
-                                    <td>{e.description}</td>
-                                    <td>{e.minutes}m</td>
+                                    <td>{new Date(e.start_time).toLocaleDateString()}</td>
+                                    <td style={{ fontWeight: 500, color: '#4f46e5' }}>{e.project?.project_name || 'Unknown'}</td>
+                                    <td>{e.description || '-'}</td>
+                                    <td>{e.duration_minutes}m</td>
                                     <td>
                                         <span style={{
                                             padding: '2px 8px',
                                             borderRadius: '999px',
                                             fontSize: '0.75rem',
-                                            background: e.billable ? '#d1fae5' : '#f3f4f6',
-                                            color: e.billable ? '#065f46' : '#374151'
+                                            background: e.is_billable ? '#d1fae5' : '#f3f4f6',
+                                            color: e.is_billable ? '#065f46' : '#374151'
                                         }}>
-                                            {e.billable ? 'Billable' : 'Non-Billable'}
+                                            {e.is_billable ? 'Billable' : 'Non-Billable'}
                                         </span>
                                     </td>
                                     <td>
