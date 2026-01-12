@@ -6,9 +6,15 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "mock:api": "node mock-data/server.js",
+    "mock:reset": "node mock-data/generate-data.js",
+    "dev:mock": "concurrently \"npm run mock:api\" \"npm run dev\""
   },
   "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.90.1",
     "@time-tracker/dto": "*",
     "axios": "^1.13.2",
     "caniuse-lite": "^1.0.30001762",
@@ -24,8 +30,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "json-server": "^1.0.0-beta.3",
     "typescript": "^5"
   }
 }

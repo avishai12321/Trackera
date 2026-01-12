@@ -36,3 +36,7 @@ dist/
 
 # Next.js
 .next/
+
+# Mock Data (optional - you can commit db.json as default state or regenerate locally)
+# Uncomment the line below to ignore local changes to mock data:
+# apps/web/mock-data/db.json

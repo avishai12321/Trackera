@@ -5,20 +5,27 @@ import Header from './Header';
 import styles from './Layout.module.scss';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const [mounted, setMounted] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         setMounted(true);
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-            router.push('/login');
-        }
+        checkAuth();
     }, [router]);
 
-    if (!mounted) return null;
+    async function checkAuth() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            router.push('/login');
+        }
+        setLoading(false);
+    }
+
+    if (!mounted || loading) return null;
 
     return (
         <div className={styles.layout}>

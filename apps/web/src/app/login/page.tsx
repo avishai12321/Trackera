@@ -2,14 +2,13 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
 import { useRouter } from 'next/navigation';
+import { signIn } from '@/lib/supabase';
 
 export default function Login() {
     const router = useRouter();
-    const [email, setEmail] = useState('alice@acme.com');
-    const [password, setPassword] = useState('password123');
-    const [tenantId, setTenantId] = useState('08a38db9-0846-4d81-98ca-416c754ee4c9');
+    const [email, setEmail] = useState('admin@testcompany.com');
+    const [password, setPassword] = useState('TestPassword123!');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -19,25 +18,10 @@ export default function Login() {
         setError('');
 
         try {
-            const res = await axios.post('http://localhost:3000/auth/login', {
-                email,
-                password
-            }, {
-                headers: {
-                    'x-tenant-id': tenantId
-                }
-            });
-
-            const { accessToken, user } = res.data;
-
-            // Store in localStorage
-            localStorage.setItem('accessToken', accessToken);
-            localStorage.setItem('user', JSON.stringify(user));
-            localStorage.setItem('tenantId', tenantId);
-
+            await signIn(email, password);
             router.push('/dashboard');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Login failed');
+            setError(err.message || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }
@@ -51,14 +35,6 @@ export default function Login() {
                 {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{String(error)}</div>}
 
                 <form onSubmit={handleLogin}>
-                    <label>Tenant ID</label>
-                    <input
-                        type="text"
-                        value={tenantId}
-                        onChange={e => setTenantId(e.target.value)}
-                        required
-                    />
-
                     <label>Email</label>
                     <input
                         type="email"

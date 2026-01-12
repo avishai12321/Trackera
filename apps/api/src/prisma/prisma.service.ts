@@ -2,9 +2,11 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { TenantContext } from '../shared/tenant-context';
 
+type ExtendedPrismaClient = ReturnType<typeof PrismaClient.prototype.$extends>;
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
-    private extendedClient: any;
+    private extendedClient: ExtendedPrismaClient | null = null;
 
     async onModuleInit() {
         await this.$connect();
@@ -52,9 +54,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
 
     // Helper to access the extended client
-    get client() {
+    get client(): PrismaClient {
         if (!this.extendedClient) return this;
-        return this.extendedClient;
+        return this.extendedClient as unknown as PrismaClient;
     }
 
     async withTenant<T>(tenantId: string, callback: (tx: any) => Promise<T>): Promise<T> {

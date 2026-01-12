@@ -1,11 +1,122 @@
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+    CompanyOverviewData,
+    ProjectViewData,
+    EmployeeOverviewData,
+    EmployeeDeepDiveData
+} from './dashboard.interfaces';
 
 @Injectable()
 export class DashboardService {
     constructor(private prisma: PrismaService) { }
 
+    /**
+     * Get company schema name from tenant ID
+     * For now, we'll use a simple mapping - you may want to query the public.companies table
+     */
+    private async getSchemaName(tenantId: string): Promise<string> {
+        // Query the public.companies table to get schema_name from tenant ID
+        const result = await this.prisma.client.$queryRawUnsafe<{ schema_name: string }[]>(
+            'SELECT schema_name FROM public.companies WHERE id = $1',
+            tenantId
+        );
+
+        if (!result || result.length === 0) {
+            throw new Error(`Company not found for tenant ID: ${tenantId}`);
+        }
+
+        return result[0].schema_name;
+    }
+
+    /**
+     * PAGE 1: Company Overview Dashboard
+     */
+    async getCompanyOverview(
+        tenantId: string,
+        startDate: string,
+        endDate: string
+    ): Promise<CompanyOverviewData> {
+        const schemaName = await this.getSchemaName(tenantId);
+
+        const result = await this.prisma.client.$queryRawUnsafe<{ get_company_overview: CompanyOverviewData }[]>(
+            'SELECT public.get_company_overview($1, $2::date, $3::date) as get_company_overview',
+            schemaName,
+            startDate,
+            endDate
+        );
+
+        return result[0].get_company_overview;
+    }
+
+    /**
+     * PAGE 2: Project View Dashboard
+     */
+    async getProjectView(
+        tenantId: string,
+        projectId: string,
+        startDate: string,
+        endDate: string
+    ): Promise<ProjectViewData> {
+        const schemaName = await this.getSchemaName(tenantId);
+
+        const result = await this.prisma.client.$queryRawUnsafe<{ get_project_view: ProjectViewData }[]>(
+            'SELECT public.get_project_view($1, $2::uuid, $3::date, $4::date) as get_project_view',
+            schemaName,
+            projectId,
+            startDate,
+            endDate
+        );
+
+        return result[0].get_project_view;
+    }
+
+    /**
+     * PAGE 3: Employee Overview Dashboard
+     */
+    async getEmployeeOverview(
+        tenantId: string,
+        startDate: string,
+        endDate: string
+    ): Promise<EmployeeOverviewData> {
+        const schemaName = await this.getSchemaName(tenantId);
+
+        const result = await this.prisma.client.$queryRawUnsafe<{ get_employee_overview: EmployeeOverviewData }[]>(
+            'SELECT public.get_employee_overview($1, $2::date, $3::date) as get_employee_overview',
+            schemaName,
+            startDate,
+            endDate
+        );
+
+        return result[0].get_employee_overview;
+    }
+
+    /**
+     * PAGE 4: Employee Deep Dive Dashboard
+     */
+    async getEmployeeDeepDive(
+        tenantId: string,
+        employeeId: string,
+        startDate: string,
+        endDate: string
+    ): Promise<EmployeeDeepDiveData> {
+        const schemaName = await this.getSchemaName(tenantId);
+
+        const result = await this.prisma.client.$queryRawUnsafe<{ get_employee_deep_dive: EmployeeDeepDiveData }[]>(
+            'SELECT public.get_employee_deep_dive($1, $2::uuid, $3::date, $4::date) as get_employee_deep_dive',
+            schemaName,
+            employeeId,
+            startDate,
+            endDate
+        );
+
+        return result[0].get_employee_deep_dive;
+    }
+
+    /**
+     * LEGACY: Keep existing getStats method for backward compatibility
+     */
     async getStats(tenantId: string, userId: string) {
         // 1. Resolve Employee ID
         const employee = await this.prisma.client.employee.findFirst({
