@@ -25,3 +25,7 @@ export enum CalendarProvider { GOOGLE = 'GOOGLE', MICROSOFT = 'MICROSOFT' }
 export enum ConnectionStatus { ACTIVE = 'ACTIVE', REVOKED = 'REVOKED', ERROR = 'ERROR' }
 
 export enum SubscriptionStatus { ACTIVE = 'ACTIVE', EXPIRED = 'EXPIRED', ERROR = 'ERROR' }
+
+export enum ClientStatus { ACTIVE = 'ACTIVE', INACTIVE = 'INACTIVE', ARCHIVED = 'ARCHIVED' }
+
+export enum ProjectBudgetType { FIXED = 'FIXED', HOURLY_RATE = 'HOURLY_RATE' }

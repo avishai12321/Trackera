@@ -5,8 +5,8 @@ import "../styles/globals.scss";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Time Tracker",
-  description: "SaaS Time Tracker MVP",
+  title: "Trackera",
+  description: "Project Management & Time Tracking SaaS",
 };
 
 export default function RootLayout({
