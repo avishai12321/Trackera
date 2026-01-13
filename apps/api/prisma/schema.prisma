@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -72,6 +73,17 @@ enum JobStatus {
   FAILED
 }
 
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum ProjectBudgetType {
+  FIXED
+  HOURLY_RATE
+}
+
 model Tenant {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
@@ -89,6 +101,9 @@ model Tenant {
   calendarSubscriptions CalendarSubscription[]
   reportJobs          ReportJob[]
   auditLogs           AuditLog[]
+  clients             Client[]
+  timeAllocations     TimeAllocation[]
+  projectBudgets      ProjectBudget[]
 
   @@map("tenants")
 }
@@ -159,14 +174,37 @@ model Employee {
   employeeCode String?  @map("employee_code")
   email        String?
   status       EmployeeStatus @default(ACTIVE)
+
+  // Enhanced fields for employee management
+  position     String?
+  department   String?
+  level        String?
+  salary       Decimal? @db.Decimal(10, 2)
+  currency     String?  @default("USD")
+  hourlyRate   Decimal? @map("hourly_rate") @db.Decimal(10, 2)
+
+  // Manager hierarchy (simple one-to-one)
+  managerId    String?  @map("manager_id") @db.Uuid
+
+  // Capacity and experience
+  monthlyCapacity    Decimal? @map("monthly_capacity") @db.Decimal(10, 2) @default(160.00)
+  yearsOfExperience  Decimal? @map("years_of_experience") @db.Decimal(4, 1)
+  hireDate           DateTime? @map("hire_date") @db.Date
+
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
   user         User?    @relation(fields: [userId], references: [id])
-  
-  projectMembers ProjectMember[]
-  timeEntries    TimeEntry[]
+
+  // Manager relationship
+  manager      Employee?  @relation("EmployeeManager", fields: [managerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subordinates Employee[] @relation("EmployeeManager")
+
+  projectMembers  ProjectMember[]
+  timeEntries     TimeEntry[]
+  timeAllocations TimeAllocation[]
+  managedProjects Project[] @relation("ProjectManager")
 
   @@map("employees")
 }
@@ -180,12 +218,31 @@ model Project {
   status      ProjectStatus @default(ACTIVE)
   startDate   DateTime? @map("start_date") @db.Date
   endDate     DateTime? @map("end_date") @db.Date
+
+  // Client relationship
+  clientId    String?  @map("client_id") @db.Uuid
+
+  // Project manager
+  managerId   String?  @map("manager_id") @db.Uuid
+
+  // Budget configuration
+  budgetType      ProjectBudgetType @default(FIXED) @map("budget_type")
+  totalBudget     Decimal? @map("total_budget") @db.Decimal(10, 2)
+  hourlyRate      Decimal? @map("hourly_rate") @db.Decimal(10, 2)
+  estimatedHours  Decimal? @map("estimated_hours") @db.Decimal(10, 2)
+  currency        String?  @default("USD")
+
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  members     ProjectMember[]
-  timeEntries TimeEntry[]
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  client          Client?  @relation(fields: [clientId], references: [id])
+  manager         Employee? @relation("ProjectManager", fields: [managerId], references: [id])
+
+  members         ProjectMember[]
+  timeEntries     TimeEntry[]
+  budgets         ProjectBudget[]
+  timeAllocations TimeAllocation[]
 
   @@map("projects")
 }
@@ -342,4 +399,96 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@map("audit_logs")
+}
+
+model Client {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+
+  // Basic Information
+  name        String
+  code        String?
+
+  // Contact Information
+  email       String?
+  phone       String?
+  contactPerson String? @map("contact_person")
+
+  // Address
+  address     String?
+  city        String?
+  state       String?
+  postalCode  String?  @map("postal_code")
+  country     String?
+
+  // Company Details
+  companyRegistrationNumber String? @map("company_registration_number")
+  taxId       String?  @map("tax_id")
+  vatNumber   String?  @map("vat_number")
+
+  // Billing Information
+  defaultBillingRate Decimal? @map("default_billing_rate") @db.Decimal(10, 2)
+  currency    String?  @default("USD")
+  paymentTerms String? @map("payment_terms")
+
+  // Contract Information
+  contractStartDate DateTime? @map("contract_start_date") @db.Date
+  contractEndDate   DateTime? @map("contract_end_date") @db.Date
+  contractNotes     String?   @map("contract_notes")
+
+  status      ClientStatus @default(ACTIVE)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  projects    Project[]
+
+  @@unique([tenantId, code])
+  @@map("clients")
+}
+
+model TimeAllocation {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+
+  month       Int      // 1-12
+  year        Int
+
+  allocatedHours Decimal @map("allocated_hours") @db.Decimal(10, 2)
+  notes       String?
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  project     Project  @relation(fields: [projectId], references: [id])
+  employee    Employee @relation(fields: [employeeId], references: [id])
+
+  @@unique([tenantId, projectId, employeeId, year, month])
+  @@index([tenantId, projectId, year, month])
+  @@index([tenantId, employeeId, year, month])
+  @@map("time_allocations")
+}
+
+model ProjectBudget {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  projectId   String   @map("project_id") @db.Uuid
+
+  month       Int
+  year        Int
+
+  budgetAmount Decimal? @map("budget_amount") @db.Decimal(10, 2)
+  budgetHours  Decimal? @map("budget_hours") @db.Decimal(10, 2)
+
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  project     Project  @relation(fields: [projectId], references: [id])
+
+  @@unique([tenantId, projectId, year, month])
+  @@map("project_budgets")
 }

@@ -1,7 +1,7 @@
 {
-  "name": "time-tracker-saas",
+  "name": "trackera",
   "version": "1.0.0",
-  "description": "Multi-tenant Time Tracking SaaS",
+  "description": "Project Management & Time Tracking SaaS",
   "private": true,
   "workspaces": [
     "apps/*",

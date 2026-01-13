@@ -8,3 +8,6 @@ export * from './time-entries/time-entries.dto';
 export * from './dashboard/dashboard.dto';
 export * from './reports/reports.dto';
 export * from './calendar/calendar.dto';
+export * from './clients/clients.dto';
+export * from './time-allocations/time-allocations.dto';
+export * from './project-budgets/project-budgets.dto';

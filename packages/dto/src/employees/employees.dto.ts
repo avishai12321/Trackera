@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, IsNumber, IsDateString } from 'class-validator';
 import { EmployeeStatus } from '../shared/enums';
 
 export class CreateEmployeeDto {
@@ -16,6 +16,36 @@ export class CreateEmployeeDto {
 
     @IsOptional() @IsString()
     userId?: string;
+
+    @IsOptional() @IsString()
+    position?: string;
+
+    @IsOptional() @IsString()
+    department?: string;
+
+    @IsOptional() @IsString()
+    level?: string;
+
+    @IsOptional() @IsNumber()
+    salary?: number;
+
+    @IsOptional() @IsString()
+    currency?: string;
+
+    @IsOptional() @IsNumber()
+    hourlyRate?: number;
+
+    @IsOptional() @IsString()
+    managerId?: string;
+
+    @IsOptional() @IsNumber()
+    monthlyCapacity?: number;
+
+    @IsOptional() @IsNumber()
+    yearsOfExperience?: number;
+
+    @IsOptional() @IsDateString()
+    hireDate?: string;
 }
 
 export class UpdateEmployeeDto {
@@ -30,6 +60,36 @@ export class UpdateEmployeeDto {
 
     @IsOptional() @IsEnum(EmployeeStatus)
     status?: EmployeeStatus;
+
+    @IsOptional() @IsString()
+    position?: string;
+
+    @IsOptional() @IsString()
+    department?: string;
+
+    @IsOptional() @IsString()
+    level?: string;
+
+    @IsOptional() @IsNumber()
+    salary?: number;
+
+    @IsOptional() @IsString()
+    currency?: string;
+
+    @IsOptional() @IsNumber()
+    hourlyRate?: number;
+
+    @IsOptional() @IsString()
+    managerId?: string;
+
+    @IsOptional() @IsNumber()
+    monthlyCapacity?: number;
+
+    @IsOptional() @IsNumber()
+    yearsOfExperience?: number;
+
+    @IsOptional() @IsDateString()
+    hireDate?: string;
 }
 
 export class EmployeeDto {
@@ -40,4 +100,26 @@ export class EmployeeDto {
     lastName!: string;
     email?: string | null;
     status!: EmployeeStatus;
+    employeeCode?: string | null;
+    position?: string | null;
+    department?: string | null;
+    level?: string | null;
+    salary?: number | null;
+    currency?: string | null;
+    hourlyRate?: number | null;
+    managerId?: string | null;
+    manager?: { id: string; firstName: string; lastName: string } | null;
+    monthlyCapacity?: number;
+    yearsOfExperience?: number | null;
+    hireDate?: Date | null;
+    createdAt!: Date;
+    updatedAt!: Date;
+}
+
+export class AssignProjectDto {
+    @IsString()
+    projectId!: string;
+
+    @IsOptional() @IsString()
+    role?: string;
 }
