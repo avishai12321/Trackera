@@ -39,7 +39,8 @@ export async function getCurrentUser() {
 export async function insertCompanyTable(tableName: string, data: any) {
     const schema = await getCompanySchema();
     const { data: result, error } = await supabase
-        .from(`${schema}.${tableName}`)
+        .schema(schema)
+        .from(tableName)
         .insert(data)
         .select()
         .single();
@@ -54,7 +55,8 @@ export async function insertCompanyTable(tableName: string, data: any) {
 export async function updateCompanyTable(tableName: string, id: string, data: any) {
     const schema = await getCompanySchema();
     const { data: result, error } = await supabase
-        .from(`${schema}.${tableName}`)
+        .schema(schema)
+        .from(tableName)
         .update(data)
         .eq('id', id)
         .select()
@@ -70,7 +72,8 @@ export async function updateCompanyTable(tableName: string, id: string, data: an
 export async function deleteCompanyTable(tableName: string, id: string) {
     const schema = await getCompanySchema();
     const { error } = await supabase
-        .from(`${schema}.${tableName}`)
+        .schema(schema)
+        .from(tableName)
         .delete()
         .eq('id', id);
 

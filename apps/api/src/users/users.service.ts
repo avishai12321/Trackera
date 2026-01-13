@@ -13,7 +13,7 @@ export class UsersService {
         // We must ensure we create the user in the correct tenant.
         // Even with RLS, it's good practice to set tenantId explicitly.
 
-        const user = await this.prisma.client.user.create({
+        const user = await this.prisma.db.user.create({
             data: {
                 email: createUserDto.email,
                 username: createUserDto.username,
@@ -38,18 +38,18 @@ export class UsersService {
 
     async findAll(tenantId: string) {
         // RLS will handle filtering if context is set
-        return this.prisma.client.user.findMany({
+        return this.prisma.db.user.findMany({
             where: { tenantId } // Redundant with RLS but explicit
         });
     }
 
     async findOne(id: string) {
-        return this.prisma.client.user.findUnique({ where: { id } });
+        return this.prisma.db.user.findUnique({ where: { id } });
     }
 
     async findByEmail(email: string, tenantId?: string) {
         if (tenantId) {
-            return this.prisma.client.user.findUnique({
+            return this.prisma.db.user.findUnique({
                 where: { tenantId_email: { tenantId, email } },
                 include: { roles: true, employee: true }
             });
@@ -62,7 +62,7 @@ export class UsersService {
     }
 
     async update(id: string, updateUserDto: UpdateUserDto) {
-        const user = await this.prisma.client.user.update({
+        const user = await this.prisma.db.user.update({
             where: { id },
             data: {
                 email: updateUserDto.email,

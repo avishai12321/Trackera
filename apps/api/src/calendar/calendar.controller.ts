@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Res, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Query, Res, UseGuards, Request, BadRequestException, Param } from '@nestjs/common';
 import { CalendarService } from './calendar.service';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { AuthGuard } from '@nestjs/passport';
@@ -8,6 +8,22 @@ import { Public } from '../common/decorators/public.decorator';
 @Controller('calendar')
 export class CalendarController {
     constructor(private readonly calendarService: CalendarService) { }
+
+    @Get('connections')
+    @UseGuards(TenantGuard, AuthGuard('jwt'))
+    async getConnections(@Request() req: any) {
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new BadRequestException('Tenant context missing');
+        return this.calendarService.getConnections(tenantId, req.user.id);
+    }
+
+    @Post('sync/:connectionId')
+    @UseGuards(TenantGuard, AuthGuard('jwt'))
+    async syncConnection(@Request() req: any, @Param('connectionId') connectionId: string) {
+        if (!connectionId) throw new BadRequestException('Connection ID is required');
+        await this.calendarService.enqueueSync(connectionId);
+        return { message: 'Sync initiated' };
+    }
 
     @Get('connect/google')
     @UseGuards(TenantGuard, AuthGuard('jwt'))
@@ -26,9 +42,9 @@ export class CalendarController {
         // But OAuth callback often loses session context depending on browser policy (SameSite).
         // Usually 'state' parameter preserves context.
 
-        const connection = await this.calendarService.handleGoogleCallback(code, state);
-        if (connection) {
-            await this.calendarService.enqueueSync(connection.id);
+        const response = await this.calendarService.handleGoogleCallback(code, state);
+        if (response.connectionId) {
+            await this.calendarService.enqueueSync(response.connectionId);
         }
         return res.redirect((process.env.FRONTEND_URL || 'http://localhost:3001') + '/calendar?status=success');
     }
@@ -43,9 +59,9 @@ export class CalendarController {
     @Public()
     @Get('callback/microsoft')
     async callbackMicrosoft(@Query('code') code: string, @Query('state') state: string, @Res() res: any) {
-        const connection = await this.calendarService.handleMicrosoftCallback(code, state);
-        if (connection) {
-            await this.calendarService.enqueueSync(connection.id);
+        const response = await this.calendarService.handleMicrosoftCallback(code, state);
+        if (response.data) {
+            await this.calendarService.enqueueSync((response.data as any).id);
         }
         return res.redirect((process.env.FRONTEND_URL || 'http://localhost:3001') + '/calendar?status=success');
     }

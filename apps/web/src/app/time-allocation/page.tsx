@@ -70,7 +70,8 @@ export default function TimeAllocation() {
 
             // Fetch projects with relations
             const { data: projectsData, error: projectsError } = await supabase
-                .from(`${schema}.projects`)
+                .schema(schema)
+                .from('projects')
                 .select(`
                     *,
                     client:client_id (name),
@@ -88,10 +89,11 @@ export default function TimeAllocation() {
             }
 
             // Fetch employees
-            const { data: employeesData, error: employeesError} = await supabase
-                .from(`${schema}.users`)
+            const { data: employeesData, error: employeesError } = await supabase
+                .schema(schema)
+                .from('employees')
                 .select('id, first_name, last_name, monthly_capacity, hourly_rate')
-                .eq('is_active', true)
+                .eq('status', 'ACTIVE')
                 .order('first_name');
 
             if (employeesError) throw employeesError;
@@ -99,7 +101,8 @@ export default function TimeAllocation() {
 
             // Fetch time allocations
             const { data: allocationsData, error: allocationsError } = await supabase
-                .from(`${schema}.time_allocations`)
+                .schema(schema)
+                .from('time_allocations')
                 .select('project_id, employee_id, year, month, allocated_hours');
 
             if (allocationsError) throw allocationsError;
@@ -114,7 +117,8 @@ export default function TimeAllocation() {
 
             // Fetch logged hours per project (from time_entries)
             const { data: timeEntriesData, error: timeEntriesError } = await supabase
-                .from(`${schema}.time_entries`)
+                .schema(schema)
+                .from('time_entries')
                 .select('project_id, hours');
 
             if (!timeEntriesError && timeEntriesData) {
@@ -278,7 +282,8 @@ export default function TimeAllocation() {
 
             // Upsert allocations
             const { error } = await supabase
-                .from(`${schema}.time_allocations`)
+                .schema(schema)
+                .from('time_allocations')
                 .upsert(allocationRecords, {
                     onConflict: 'tenant_id,project_id,employee_id,year,month'
                 });

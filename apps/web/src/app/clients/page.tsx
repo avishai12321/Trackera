@@ -43,7 +43,8 @@ export default function Clients() {
 
             const schema = await getCompanySchema();
             const { data, error } = await supabase
-                .from(`${schema}.clients`)
+                .schema(schema)
+                .from('clients')
                 .select('*')
                 .order('created_at', { ascending: false });
 

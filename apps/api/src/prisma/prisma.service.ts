@@ -54,7 +54,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
 
     // Helper to access the extended client
-    get client(): PrismaClient {
+    get db(): PrismaClient {
         if (!this.extendedClient) return this;
         return this.extendedClient as unknown as PrismaClient;
     }

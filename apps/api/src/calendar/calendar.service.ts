@@ -1,10 +1,22 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseService } from '../shared/supabase.service';
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-import { CalendarProvider, ConnectionStatus } from '@prisma/client';
+// import { CalendarProvider, ConnectionStatus } from '@prisma/client'; // Removed Prisma enum imports
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+
+// Define Enums locally if removed from Prisma or just use strings
+enum CalendarProvider {
+    GOOGLE = 'GOOGLE',
+    MICROSOFT = 'MICROSOFT'
+}
+
+enum ConnectionStatus {
+    ACTIVE = 'ACTIVE',
+    REVOKED = 'REVOKED',
+    ERROR = 'ERROR'
+}
 
 @Injectable()
 export class CalendarService {
@@ -12,7 +24,7 @@ export class CalendarService {
     private readonly logger = new Logger(CalendarService.name);
 
     constructor(
-        private prisma: PrismaService,
+        private supabase: SupabaseService,
         @InjectQueue('calendar-sync') private calendarSyncQueue: Queue
     ) {
         this.googleClient = new google.auth.OAuth2(
@@ -26,17 +38,32 @@ export class CalendarService {
         await this.calendarSyncQueue.add('sync-events', { connectionId });
     }
 
+    async getConnections(tenantId: string, userId: string) {
+        const { data, error } = await this.supabase.getAdminClient()
+            .from('calendar_connections')
+            .select('id, provider, provider_account_id, status, last_sync_at, created_at')
+            .eq('tenant_id', tenantId)
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            this.logger.error('Error fetching connections', error);
+            return [];
+        }
+
+        return data || [];
+    }
+
     async syncEvents(connectionId: string) {
         this.logger.log(`Syncing events for connection ${connectionId}`);
 
-        // 1. Fetch connection (Raw first to finding tenant)
-        // We use a raw query or findUnique without RLS context to find the tenant.
-        // Since we are in a background job, we don't have a TenantContext set yet.
-        const connectionRaw = await this.prisma.calendarConnection.findUnique({
-            where: { id: connectionId }
-        });
+        const { data: connectionRaw, error } = await this.supabase.getAdminClient()
+            .from('calendar_connections')
+            .select('*')
+            .eq('id', connectionId)
+            .single();
 
-        if (!connectionRaw) {
+        if (error || !connectionRaw) {
             this.logger.error(`Connection ${connectionId} not found`);
             return;
         }
@@ -44,7 +71,7 @@ export class CalendarService {
         if (connectionRaw.provider === CalendarProvider.GOOGLE) {
             return this.syncGoogleEvents(connectionRaw);
         } else if (connectionRaw.provider === CalendarProvider.MICROSOFT) {
-            return this.syncMicrosoftEvents(connectionRaw); // Future
+            return this.syncMicrosoftEvents(connectionRaw);
         }
 
         return { status: 'skipped', reason: 'unknown_provider' };
@@ -56,157 +83,137 @@ export class CalendarService {
     }
 
     private async syncGoogleEvents(connectionRaw: any) {
-        const { id: connectionId, tenantId, accessTokenEncrypted, refreshTokenEncrypted, syncCursor } = connectionRaw;
+        const { id: connectionId, tenant_id: tenantId, access_token_encrypted: accessTokenEncrypted, refresh_token_encrypted: refreshTokenEncrypted, sync_cursor: syncCursor } = connectionRaw;
 
-        await this.prisma.withTenant(tenantId, async (tx) => {
-            // 2. Setup Google Client
-            const client = new google.auth.OAuth2(
-                process.env.GOOGLE_CLIENT_ID,
-                process.env.GOOGLE_CLIENT_SECRET,
-                process.env.GOOGLE_REDIRECT_URI
-            );
+        // 2. Setup Google Client
+        const client = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET,
+            process.env.GOOGLE_REDIRECT_URI
+        );
 
-            client.setCredentials({
-                access_token: accessTokenEncrypted,
-                refresh_token: refreshTokenEncrypted || undefined
-            });
-
-            // Listen for token updates (refresh)
-            client.on('tokens', async (tokens) => {
-                this.logger.log('Tokens refreshed');
-                await tx.calendarConnection.update({
-                    where: { id: connectionId },
-                    data: {
-                        accessTokenEncrypted: tokens.access_token,
-                        tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : undefined,
-                        updatedAt: new Date()
-                        // If refresh_token is returned, update it too (rare for Google unless prompted)
-                    }
-                });
-            });
-
-            const calendar = google.calendar({ version: 'v3', auth: client });
-
-            try {
-                // 3. Call Google API
-                const listParams: any = {
-                    calendarId: 'primary',
-                    singleEvents: true, // Expand recurring events for simpler suggestion logic
-                    maxResults: 250,
-                };
-
-                if (syncCursor) {
-                    listParams.syncToken = syncCursor;
-                } else {
-                    // Initial sync: fetch from now - 1 month? Or just future?
-                    // Let's fetch last 30 days and future
-                    const now = new Date();
-                    const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-                    listParams.timeMin = oneMonthAgo.toISOString();
-                }
-
-                let nextSyncToken: string | undefined | null = null;
-                let pageToken: string | undefined = undefined;
-
-                do {
-                    if (pageToken) listParams.pageToken = pageToken;
-
-                    const res = await calendar.events.list(listParams);
-                    const items = res.data.items || [];
-                    nextSyncToken = res.data.nextSyncToken;
-                    pageToken = res.data.nextPageToken || undefined;
-
-                    // 4. Upsert events
-                    for (const event of items) {
-                        if (event.status === 'cancelled') {
-                            // Handle deletion
-                            if (event.id) {
-                                await tx.calendarEvent.deleteMany({
-                                    where: {
-                                        connectionId,
-                                        providerEventId: event.id
-                                    }
-                                });
-                            }
-                        } else {
-                            if (!event.start || !event.end) continue;
-
-                            const startAt = event.start.dateTime || event.start.date; // Date-only if all-day
-                            const endAt = event.end.dateTime || event.end.date;
-
-                            if (!startAt || !endAt) continue;
-
-                            await tx.calendarEvent.upsert({
-                                where: {
-                                    tenantId_connectionId_provider_providerEventId: {
-                                        tenantId,
-                                        connectionId,
-                                        provider: CalendarProvider.GOOGLE,
-                                        providerEventId: event.id!
-                                    }
-                                },
-                                update: {
-                                    title: event.summary,
-                                    startAt: new Date(startAt),
-                                    endAt: new Date(endAt),
-                                    isAllDay: !event.start.dateTime, // If no DateTime, it's date-only
-                                    location: event.location,
-                                    updatedAtProvider: new Date()
-                                },
-                                create: {
-                                    tenantId,
-                                    connectionId,
-                                    provider: CalendarProvider.GOOGLE,
-                                    providerEventId: event.id!,
-                                    icalUid: event.iCalUID || undefined, // Fix null issue
-                                    title: event.summary,
-                                    startAt: new Date(startAt),
-                                    endAt: new Date(endAt),
-                                    isAllDay: !event.start.dateTime,
-                                    location: event.location,
-                                    updatedAtProvider: new Date()
-                                }
-                            });
-                        }
-                    }
-
-                } while (pageToken);
-
-                // 5. Update cursor
-                if (nextSyncToken) {
-                    await tx.calendarConnection.update({
-                        where: { id: connectionId },
-                        data: {
-                            syncCursor: nextSyncToken,
-                            lastSyncAt: new Date()
-                        }
-                    });
-                }
-
-            } catch (error: any) {
-                if (error.code === 410) {
-                    this.logger.warn('Sync token invalid, clearing cursor to resync');
-                    await tx.calendarConnection.update({
-                        where: { id: connectionId },
-                        data: { syncCursor: null }
-                    });
-                    // Retry immediately or let next job handle it?
-                    // Let's enqueue another job
-                    await this.calendarSyncQueue.add('sync-events', { connectionId });
-                } else {
-                    this.logger.error('Error syncing events', error);
-                    throw error; // Let Bull retry
-                }
-            }
+        client.setCredentials({
+            access_token: accessTokenEncrypted,
+            refresh_token: refreshTokenEncrypted || undefined
         });
+
+        // Listen for token updates (refresh)
+        client.on('tokens', async (tokens) => {
+            this.logger.log('Tokens refreshed');
+            await this.supabase.getAdminClient()
+                .from('calendar_connections')
+                .update({
+                    access_token_encrypted: tokens.access_token,
+                    token_expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : undefined,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', connectionId);
+        });
+
+        const calendar = google.calendar({ version: 'v3', auth: client });
+
+        try {
+            // 3. Call Google API
+            const listParams: any = {
+                calendarId: 'primary',
+                singleEvents: true,
+                maxResults: 250,
+            };
+
+            if (syncCursor) {
+                listParams.syncToken = syncCursor;
+            } else {
+                const now = new Date();
+                const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                listParams.timeMin = oneMonthAgo.toISOString();
+            }
+
+            let nextSyncToken: string | undefined | null = null;
+            let pageToken: string | undefined = undefined;
+
+            do {
+                if (pageToken) listParams.pageToken = pageToken;
+
+                const res = await calendar.events.list(listParams);
+                const items = res.data.items || [];
+                nextSyncToken = res.data.nextSyncToken;
+                pageToken = res.data.nextPageToken || undefined;
+
+                // 4. Upsert events
+                for (const event of items) {
+                    if (event.status === 'cancelled') {
+                        // Handle deletion
+                        if (event.id) {
+                            await this.supabase.getAdminClient()
+                                .from('calendar_events')
+                                .delete()
+                                .match({
+                                    connection_id: connectionId,
+                                    provider_event_id: event.id
+                                });
+                        }
+                    } else {
+                        if (!event.start || !event.end) continue;
+
+                        const startAt = event.start.dateTime || event.start.date;
+                        const endAt = event.end.dateTime || event.end.date;
+
+                        if (!startAt || !endAt) continue;
+
+                        // Upsert Logic: Supabase upsert works if we have a unique constraint
+                        // Unique constraint on: [tenant_id, connection_id, provider, provider_event_id]
+                        // Make sure tenant_id IS included in the insert payload
+                        await this.supabase.getAdminClient()
+                            .from('calendar_events')
+                            .upsert({
+                                tenant_id: tenantId,
+                                connection_id: connectionId,
+                                provider: CalendarProvider.GOOGLE,
+                                provider_event_id: event.id!,
+                                ical_uid: event.iCalUID || null,
+                                title: event.summary,
+                                start_at: new Date(startAt).toISOString(),
+                                end_at: new Date(endAt).toISOString(),
+                                is_all_day: !event.start.dateTime,
+                                location: event.location,
+                                updated_at_provider: new Date().toISOString(),
+                                synced_at: new Date().toISOString()
+                            }, { onConflict: 'tenant_id,connection_id,provider,provider_event_id' });
+                    }
+                }
+
+            } while (pageToken);
+
+            // 5. Update cursor
+            if (nextSyncToken) {
+                await this.supabase.getAdminClient()
+                    .from('calendar_connections')
+                    .update({
+                        sync_cursor: nextSyncToken,
+                        last_sync_at: new Date().toISOString()
+                    })
+                    .eq('id', connectionId);
+            }
+
+        } catch (error: any) {
+            if (error.code === 410) {
+                this.logger.warn('Sync token invalid, clearing cursor to resync');
+                await this.supabase.getAdminClient()
+                    .from('calendar_connections')
+                    .update({ sync_cursor: null })
+                    .eq('id', connectionId);
+
+                await this.calendarSyncQueue.add('sync-events', { connectionId });
+            } else {
+                this.logger.error('Error syncing events', error);
+                throw error;
+            }
+        }
 
         return { status: 'success' };
     }
 
     async getGoogleAuthUrl(tenantId: string, userId: string) {
-        // We pack tenantId/userId into 'state' to recover them on callback
-        // In a real app, sign this state to prevent tampering (CSRF).
-        // For MVP, simplistic JSON.stringify + Base64
         const state = Buffer.from(JSON.stringify({ tenantId, userId })).toString('base64');
 
         const scopes = [
@@ -232,77 +239,116 @@ export class CalendarService {
             const decoded = JSON.parse(Buffer.from(state, 'base64').toString('utf-8'));
             tenantId = decoded.tenantId;
             userId = decoded.userId;
+            this.logger.log(`Google callback for tenant: ${tenantId}, user: ${userId}`);
         } catch (e) {
+            this.logger.error('Invalid state parameter', e);
             throw new BadRequestException('Invalid state parameter');
         }
 
-        const { tokens } = await this.googleClient.getToken(code);
+        try {
+            const { tokens } = await this.googleClient.getToken(code);
+            this.logger.log('Received tokens from Google');
 
-        // Save tokens to DB
-        // Check if connection exists, update or create
-        // We unfortunately can't set TenantContext here easily if we are in a public callback?
-        // Wait, callback route IS guarded in my controller?
-        // "AuthGuard('jwt')" -> Requires user to be logged in on the Frontend when callback hits?
-        // Yes, browser carries the token? 
-        // If 'callback/google' is hit by browser redirect, it SHOULD send the Authorization header? 
-        // NO. Browser redirects don't automatically add 'Authorization: Bearer ...' header unless we use cookies.
-        // We are using stateless JWT in headers.
-        // So the user is "Anonymous" to the backend on this GET request unless query param has token?
+            if (!tokens.access_token) throw new BadRequestException('No access token received');
 
-        // Strategy: 
-        // 1. The 'state' param recovers who the user IS.
-        // 2. We trust 'state' (should be signed in prod).
-        // 3. We use a sudo-mode to write to DB for that tenant/user.
+            // Set credentials to fetch profile
+            this.googleClient.setCredentials(tokens);
+            const oauth2 = google.oauth2({ version: 'v2', auth: this.googleClient });
+            const userInfo = await oauth2.userinfo.get();
+            const googleUserId = userInfo.data.id;
 
-        if (!tokens.access_token) throw new BadRequestException('No access token received');
+            if (!googleUserId) throw new BadRequestException('Could not retrieve Google User ID');
+            this.logger.log(`Google User ID: ${googleUserId}`);
 
-        // Set credentials to fetch profile
-        this.googleClient.setCredentials(tokens);
-        const oauth2 = google.oauth2({ version: 'v2', auth: this.googleClient });
-        const userInfo = await oauth2.userinfo.get();
-        const googleUserId = userInfo.data.id;
+            // Ensure employee exists for this user
+            const { data: employee, error: empError } = await this.supabase.getAdminClient()
+                .from('employees')
+                .select('id')
+                .match({ tenant_id: tenantId, user_id: userId })
+                .maybeSingle();
 
-        if (!googleUserId) throw new BadRequestException('Could not retrieve Google User ID');
-
-        return this.prisma.withTenant(tenantId, async (tx) => {
-            // Check existence
-            const existing = await tx.calendarConnection.findUnique({
-                where: {
-                    tenantId_userId_provider: {
-                        tenantId,
-                        userId,
-                        provider: CalendarProvider.GOOGLE
-                    }
+            if (!employee) {
+                this.logger.log(`Creating missing employee for user: ${userId}`);
+                const { error: insertEmpError } = await this.supabase.getAdminClient()
+                    .from('employees')
+                    .insert({
+                        tenant_id: tenantId,
+                        user_id: userId,
+                        first_name: userInfo.data.given_name || 'Google',
+                        last_name: userInfo.data.family_name || 'User',
+                        email: userInfo.data.email || '',
+                        status: 'ACTIVE'
+                    });
+                if (insertEmpError) {
+                    this.logger.error('Error creating missing employee', insertEmpError);
                 }
-            });
+            }
+
+            // Check existence
+            const { data: existing, error: selectError } = await this.supabase.getAdminClient()
+                .from('calendar_connections')
+                .select('*')
+                .match({
+                    tenant_id: tenantId,
+                    user_id: userId,
+                    provider: CalendarProvider.GOOGLE
+                })
+                .single();
+
+            if (selectError && selectError.code !== 'PGRST116') {
+                this.logger.error('Error checking existing connection', selectError);
+            }
 
             if (existing) {
-                return tx.calendarConnection.update({
-                    where: { id: existing.id },
-                    data: {
-                        providerAccountId: googleUserId, // Update in case it changed or was pending
-                        accessTokenEncrypted: tokens.access_token, // TODO: encrypt
-                        refreshTokenEncrypted: tokens.refresh_token || undefined, // Only update if present
-                        tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+                this.logger.log(`Updating existing connection: ${existing.id}`);
+                const { data, error } = await this.supabase.getAdminClient()
+                    .from('calendar_connections')
+                    .update({
+                        provider_account_id: googleUserId,
+                        access_token_encrypted: tokens.access_token,
+                        refresh_token_encrypted: tokens.refresh_token || undefined,
+                        token_expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
                         status: ConnectionStatus.ACTIVE,
-                        updatedAt: new Date()
-                    }
-                });
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id)
+                    .select();
+
+                if (error) {
+                    this.logger.error('Error updating connection', error);
+                    throw new BadRequestException('Failed to update calendar connection');
+                }
+                this.logger.log('Connection updated successfully');
+                const connectionId = (data as any)[0].id;
+                return { connectionId };
             } else {
-                return tx.calendarConnection.create({
-                    data: {
-                        tenantId,
-                        userId,
+                this.logger.log('Creating new connection');
+                const { data, error } = await this.supabase.getAdminClient()
+                    .from('calendar_connections')
+                    .insert({
+                        tenant_id: tenantId,
+                        user_id: userId,
                         provider: CalendarProvider.GOOGLE,
-                        providerAccountId: googleUserId,
-                        accessTokenEncrypted: tokens.access_token,
-                        refreshTokenEncrypted: tokens.refresh_token,
-                        tokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+                        provider_account_id: googleUserId,
+                        access_token_encrypted: tokens.access_token,
+                        refresh_token_encrypted: tokens.refresh_token,
+                        token_expires_at: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
                         status: ConnectionStatus.ACTIVE
-                    }
-                });
+                    })
+                    .select();
+
+                if (error) {
+                    this.logger.error('Error inserting connection', error);
+                    throw new BadRequestException('Failed to create calendar connection');
+                }
+                this.logger.log('Connection created successfully');
+                const connectionId = (data as any)[0].id;
+                return { connectionId };
             }
-        });
+        } catch (error) {
+            this.logger.error('Error in handleGoogleCallback', error);
+            throw error;
+        }
     }
 
     async getMicrosoftAuthUrl(tenantId: string, userId: string) {
@@ -365,48 +411,47 @@ export class CalendarService {
         const profile = await profileResponse.json();
         const msUserId = profile.id;
 
-        return this.prisma.withTenant(tenantId, async (tx) => {
-            const existing = await tx.calendarConnection.findUnique({
-                where: {
-                    tenantId_userId_provider: {
-                        tenantId,
-                        userId,
-                        provider: CalendarProvider.MICROSOFT
-                    }
-                }
-            });
+        // Check existence
+        const { data: existing } = await this.supabase.getAdminClient()
+            .from('calendar_connections')
+            .select('*')
+            .match({
+                tenant_id: tenantId,
+                user_id: userId,
+                provider: CalendarProvider.MICROSOFT
+            })
+            .single();
 
-            // Calculate expiry
-            const expiresAt = new Date();
-            expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expires_in || 3600));
+        // Calculate expiry
+        const expiresAt = new Date();
+        expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expires_in || 3600));
 
-            if (existing) {
-                return tx.calendarConnection.update({
-                    where: { id: existing.id },
-                    data: {
-                        providerAccountId: msUserId,
-                        accessTokenEncrypted: tokens.access_token,
-                        refreshTokenEncrypted: tokens.refresh_token,
-                        tokenExpiresAt: expiresAt,
-                        status: ConnectionStatus.ACTIVE,
-                        updatedAt: new Date()
-                    }
+        if (existing) {
+            return this.supabase.getAdminClient()
+                .from('calendar_connections')
+                .update({
+                    provider_account_id: msUserId,
+                    access_token_encrypted: tokens.access_token,
+                    refresh_token_encrypted: tokens.refresh_token,
+                    token_expires_at: expiresAt.toISOString(),
+                    status: ConnectionStatus.ACTIVE,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', existing.id);
+        } else {
+            return this.supabase.getAdminClient()
+                .from('calendar_connections')
+                .insert({
+                    tenant_id: tenantId,
+                    user_id: userId,
+                    provider: CalendarProvider.MICROSOFT,
+                    provider_account_id: msUserId,
+                    access_token_encrypted: tokens.access_token,
+                    refresh_token_encrypted: tokens.refresh_token,
+                    token_expires_at: expiresAt.toISOString(),
+                    status: ConnectionStatus.ACTIVE
                 });
-            } else {
-                return tx.calendarConnection.create({
-                    data: {
-                        tenantId,
-                        userId,
-                        provider: CalendarProvider.MICROSOFT,
-                        providerAccountId: msUserId,
-                        accessTokenEncrypted: tokens.access_token,
-                        refreshTokenEncrypted: tokens.refresh_token,
-                        tokenExpiresAt: expiresAt,
-                        status: ConnectionStatus.ACTIVE
-                    }
-                });
-            }
-        });
+        }
     }
 }
 

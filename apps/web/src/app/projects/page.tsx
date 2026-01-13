@@ -41,7 +41,8 @@ export default function Projects() {
 
             // Fetch projects with relations
             const { data: projectsData, error: projectsError } = await supabase
-                .from(`${schema}.projects`)
+                .schema(schema)
+                .from('projects')
                 .select(`
                     *,
                     client:client_id (id, name),
@@ -54,7 +55,8 @@ export default function Projects() {
 
             // Fetch clients for dropdown
             const { data: clientsData, error: clientsError } = await supabase
-                .from(`${schema}.clients`)
+                .schema(schema)
+                .from('clients')
                 .select('id, name')
                 .eq('status', 'ACTIVE')
                 .order('name');
@@ -64,9 +66,10 @@ export default function Projects() {
 
             // Fetch employees for manager dropdown
             const { data: employeesData, error: employeesError } = await supabase
-                .from(`${schema}.users`)
+                .schema(schema)
+                .from('employees')
                 .select('id, first_name, last_name')
-                .eq('is_active', true)
+                .eq('status', 'ACTIVE')
                 .order('first_name');
 
             if (employeesError) throw employeesError;

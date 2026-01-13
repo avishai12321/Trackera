@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import axios from 'axios';
 import { useRouter, useSearchParams } from 'next/navigation';
-
+import { supabase } from '@/lib/supabase';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Plus, Calendar as CalendarIcon, Loader } from 'lucide-react';
 
@@ -13,16 +13,22 @@ function CalendarContent() {
 
     const [suggestions, setSuggestions] = useState([]);
     const [projects, setProjects] = useState([]);
+    const [connections, setConnections] = useState([]);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [loading, setLoading] = useState(true);
+    const [syncing, setSyncing] = useState<Record<string, boolean>>({});
 
     // Track selected project per suggestion. Key: suggestionId, Value: projectId
     const [selections, setSelections] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (status === 'success') {
-            alert('Calendar connected successfully!!');
+            alert('Calendar connected successfully! Syncing your events...');
             router.replace('/calendar');
+            // Refresh data after connection
+            setTimeout(() => {
+                fetchData();
+            }, 2000);
         }
     }, [status, router]);
 
@@ -31,13 +37,19 @@ function CalendarContent() {
     }, [date]);
 
     const fetchData = async () => {
-        const token = localStorage.getItem('accessToken');
-        if (!token) return router.push('/login');
-        const tenantId = localStorage.getItem('tenantId');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return router.push('/login');
+
+        const token = session.access_token;
+        const tenantId = session.user.user_metadata?.company_id;
 
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId } };
+
+            // Fetch connections
+            const connRes = await axios.get('http://localhost:3000/calendar/connections', config);
+            setConnections(connRes.data);
 
             // Only fetch projects once if empty
             if (projects.length === 0) {
@@ -58,8 +70,11 @@ function CalendarContent() {
     };
 
     const handleConnect = async (provider: 'google' | 'microsoft') => {
-        const token = localStorage.getItem('accessToken');
-        const tenantId = localStorage.getItem('tenantId');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const token = session.access_token;
+        const tenantId = session.user.user_metadata?.company_id;
+
         try {
             const res = await axios.get(`http://localhost:3000/calendar/connect/${provider}`, {
                 headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
@@ -77,8 +92,10 @@ function CalendarContent() {
             return;
         }
 
-        const token = localStorage.getItem('accessToken');
-        const tenantId = localStorage.getItem('tenantId');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const token = session.access_token;
+        const tenantId = session.user.user_metadata?.company_id;
 
         try {
             await axios.post('http://localhost:3000/time-entries', {
@@ -104,6 +121,30 @@ function CalendarContent() {
         setSelections(prev => ({ ...prev, [id]: val }));
     };
 
+    const handleSync = async (connectionId: string) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const token = session.access_token;
+        const tenantId = session.user.user_metadata?.company_id;
+
+        setSyncing(prev => ({ ...prev, [connectionId]: true }));
+        try {
+            await axios.post(`http://localhost:3000/calendar/sync/${connectionId}`, {}, {
+                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
+            });
+            alert('Sync initiated! Please wait a few seconds and refresh.');
+            // Wait a bit then refresh
+            setTimeout(() => {
+                fetchData();
+                setSyncing(prev => ({ ...prev, [connectionId]: false }));
+            }, 3000);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to sync');
+            setSyncing(prev => ({ ...prev, [connectionId]: false }));
+        }
+    };
+
     return (
         <DashboardLayout>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
@@ -115,7 +156,7 @@ function CalendarContent() {
 
             <div className="card" style={{ marginBottom: '2rem' }}>
                 <h3 style={{ marginBottom: '1.5rem' }}>Connect Calendars</h3>
-                <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: connections.length > 0 ? '2rem' : '0' }}>
                     <button onClick={() => handleConnect('google')} className="btn" style={{ background: '#DB4437', color: 'white' }}>
                         Connect Google Calendar
                     </button>
@@ -123,6 +164,67 @@ function CalendarContent() {
                         Connect Microsoft Calendar
                     </button>
                 </div>
+
+                {connections.length > 0 && (
+                    <>
+                        <h4 style={{ marginBottom: '1rem', marginTop: '1rem' }}>Connected Calendars</h4>
+                        <div className="table-container" style={{ border: 'none' }}>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Provider</th>
+                                        <th>Status</th>
+                                        <th>Last Synced</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {connections.map((conn: any) => (
+                                        <tr key={conn.id}>
+                                            <td style={{ fontWeight: 500 }}>
+                                                {conn.provider === 'GOOGLE' ? '🔵 Google Calendar' : '🔷 Microsoft Calendar'}
+                                            </td>
+                                            <td>
+                                                <span style={{
+                                                    padding: '0.25rem 0.75rem',
+                                                    borderRadius: '12px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 500,
+                                                    background: conn.status === 'ACTIVE' ? '#dcfce7' : '#fee2e2',
+                                                    color: conn.status === 'ACTIVE' ? '#166534' : '#991b1b'
+                                                }}>
+                                                    {conn.status}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {conn.last_sync_at
+                                                    ? new Date(conn.last_sync_at).toLocaleString()
+                                                    : 'Never'}
+                                            </td>
+                                            <td>
+                                                <button
+                                                    onClick={() => handleSync(conn.id)}
+                                                    disabled={syncing[conn.id]}
+                                                    className="btn btn-primary"
+                                                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}
+                                                >
+                                                    {syncing[conn.id] ? (
+                                                        <>
+                                                            <Loader className="animate-spin" size={14} style={{ display: 'inline-block', marginRight: '0.25rem' }} />
+                                                            Syncing...
+                                                        </>
+                                                    ) : (
+                                                        '🔄 Sync Now'
+                                                    )}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
             </div>
 
             <div className="card">

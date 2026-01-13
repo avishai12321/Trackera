@@ -1,48 +1,75 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateProjectDto, UpdateProjectDto, ProjectDto } from '@time-tracker/dto';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseService } from '../shared/supabase.service';
 
 @Injectable()
 export class ProjectsService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private supabase: SupabaseService) { }
 
     async create(createProjectDto: CreateProjectDto, tenantId: string) {
-        // RLS context handles tenant isolation, but we explicit set tenantId for clarity
-        return this.prisma.client.project.create({
-            data: {
+        const { data, error } = await this.supabase.getAdminClient()
+            .from('projects')
+            .insert({
+                tenant_id: tenantId,
                 name: createProjectDto.name,
                 code: createProjectDto.code,
                 description: createProjectDto.description,
                 status: 'ACTIVE',
-                tenantId: tenantId,
-            },
-        });
+            })
+            .select()
+            .single();
+
+        if (error) throw new Error(`Failed to create project: ${error.message}`);
+        return data;
     }
 
     async findAll(tenantId: string) {
-        return this.prisma.client.project.findMany({
-            where: { tenantId }
-        });
+        const { data, error } = await this.supabase.getAdminClient()
+            .from('projects')
+            .select('*')
+            .eq('tenant_id', tenantId);
+
+        if (error) throw new Error(`Failed to fetch projects: ${error.message}`);
+        return data || [];
     }
 
     async findOne(id: string) {
-        const project = await this.prisma.client.project.findUnique({
-            where: { id },
-        });
-        if (!project) throw new NotFoundException(`Project #${id} not found`);
-        return project;
+        const { data, error } = await this.supabase.getAdminClient()
+            .from('projects')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error || !data) {
+            throw new NotFoundException(`Project #${id} not found`);
+        }
+        return data;
     }
 
     async update(id: string, updateProjectDto: UpdateProjectDto) {
-        return this.prisma.client.project.update({
-            where: { id },
-            data: updateProjectDto,
-        });
+        const { data, error } = await this.supabase.getAdminClient()
+            .from('projects')
+            .update({
+                name: updateProjectDto.name,
+                code: updateProjectDto.code,
+                description: updateProjectDto.description,
+                status: updateProjectDto.status,
+            })
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw new Error(`Failed to update project: ${error.message}`);
+        return data;
     }
 
     async remove(id: string) {
-        return this.prisma.client.project.delete({
-            where: { id },
-        });
+        const { error } = await this.supabase.getAdminClient()
+            .from('projects')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw new Error(`Failed to delete project: ${error.message}`);
+        return { success: true };
     }
 }

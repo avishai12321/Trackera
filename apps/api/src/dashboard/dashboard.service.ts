@@ -18,7 +18,7 @@ export class DashboardService {
      */
     private async getSchemaName(tenantId: string): Promise<string> {
         // Query the public.companies table to get schema_name from tenant ID
-        const result = await this.prisma.client.$queryRawUnsafe<{ schema_name: string }[]>(
+        const result = await this.prisma.db.$queryRawUnsafe<{ schema_name: string }[]>(
             'SELECT schema_name FROM public.companies WHERE id = $1',
             tenantId
         );
@@ -40,7 +40,7 @@ export class DashboardService {
     ): Promise<CompanyOverviewData> {
         const schemaName = await this.getSchemaName(tenantId);
 
-        const result = await this.prisma.client.$queryRawUnsafe<{ get_company_overview: CompanyOverviewData }[]>(
+        const result = await this.prisma.db.$queryRawUnsafe<{ get_company_overview: CompanyOverviewData }[]>(
             'SELECT public.get_company_overview($1, $2::date, $3::date) as get_company_overview',
             schemaName,
             startDate,
@@ -61,7 +61,7 @@ export class DashboardService {
     ): Promise<ProjectViewData> {
         const schemaName = await this.getSchemaName(tenantId);
 
-        const result = await this.prisma.client.$queryRawUnsafe<{ get_project_view: ProjectViewData }[]>(
+        const result = await this.prisma.db.$queryRawUnsafe<{ get_project_view: ProjectViewData }[]>(
             'SELECT public.get_project_view($1, $2::uuid, $3::date, $4::date) as get_project_view',
             schemaName,
             projectId,
@@ -82,7 +82,7 @@ export class DashboardService {
     ): Promise<EmployeeOverviewData> {
         const schemaName = await this.getSchemaName(tenantId);
 
-        const result = await this.prisma.client.$queryRawUnsafe<{ get_employee_overview: EmployeeOverviewData }[]>(
+        const result = await this.prisma.db.$queryRawUnsafe<{ get_employee_overview: EmployeeOverviewData }[]>(
             'SELECT public.get_employee_overview($1, $2::date, $3::date) as get_employee_overview',
             schemaName,
             startDate,
@@ -103,7 +103,7 @@ export class DashboardService {
     ): Promise<EmployeeDeepDiveData> {
         const schemaName = await this.getSchemaName(tenantId);
 
-        const result = await this.prisma.client.$queryRawUnsafe<{ get_employee_deep_dive: EmployeeDeepDiveData }[]>(
+        const result = await this.prisma.db.$queryRawUnsafe<{ get_employee_deep_dive: EmployeeDeepDiveData }[]>(
             'SELECT public.get_employee_deep_dive($1, $2::uuid, $3::date, $4::date) as get_employee_deep_dive',
             schemaName,
             employeeId,
@@ -119,7 +119,7 @@ export class DashboardService {
      */
     async getStats(tenantId: string, userId: string) {
         // 1. Resolve Employee ID
-        const employee = await this.prisma.client.employee.findFirst({
+        const employee = await this.prisma.db.employee.findFirst({
             where: { tenantId, userId }
         });
 
@@ -154,7 +154,7 @@ export class DashboardService {
         // Parallel Queries
         const [todayAgg, weekAgg, billableAgg, recentEntries, activeProjects, projectDistAgg, employeeDistAgg, last7DaysRaw] = await Promise.all([
             // Today's total
-            this.prisma.client.timeEntry.aggregate({
+            this.prisma.db.timeEntry.aggregate({
                 where: {
                     tenantId,
                     employeeId,
@@ -163,7 +163,7 @@ export class DashboardService {
                 _sum: { minutes: true }
             }),
             // Week's total
-            this.prisma.client.timeEntry.aggregate({
+            this.prisma.db.timeEntry.aggregate({
                 where: {
                     tenantId,
                     employeeId,
@@ -172,7 +172,7 @@ export class DashboardService {
                 _sum: { minutes: true }
             }),
             // Billable Split (This Week)
-            this.prisma.client.timeEntry.groupBy({
+            this.prisma.db.timeEntry.groupBy({
                 by: ['billable'],
                 where: {
                     tenantId,
@@ -182,7 +182,7 @@ export class DashboardService {
                 _sum: { minutes: true }
             }),
             // Recent Entries
-            this.prisma.client.timeEntry.findMany({
+            this.prisma.db.timeEntry.findMany({
                 where: {
                     tenantId,
                     employeeId
@@ -192,26 +192,26 @@ export class DashboardService {
                 include: { project: true }
             }),
             // Active Projects Count
-            this.prisma.client.project.count({
+            this.prisma.db.project.count({
                 where: {
                     tenantId,
                     status: 'ACTIVE'
                 }
             }),
             // Project Distribution
-            this.prisma.client.timeEntry.groupBy({
+            this.prisma.db.timeEntry.groupBy({
                 by: ['projectId'],
                 where: { tenantId },
                 _sum: { minutes: true }
             }),
             // Employee Distribution 
-            this.prisma.client.timeEntry.groupBy({
+            this.prisma.db.timeEntry.groupBy({
                 by: ['employeeId'],
                 where: { tenantId },
                 _sum: { minutes: true }
             }),
             // Last 7 Days Activity (Raw)
-            this.prisma.client.timeEntry.findMany({
+            this.prisma.db.timeEntry.findMany({
                 where: {
                     tenantId,
                     date: { gte: new Date(new Date().setDate(new Date().getDate() - 7)) }
@@ -225,11 +225,11 @@ export class DashboardService {
         const employeeIds = employeeDistAgg.map((e: any) => e.employeeId).filter(Boolean) as string[];
 
         const [projectsMap, employeesMap] = await Promise.all([
-            this.prisma.client.project.findMany({
+            this.prisma.db.project.findMany({
                 where: { id: { in: projectIds } },
                 select: { id: true, name: true }
             }),
-            this.prisma.client.employee.findMany({
+            this.prisma.db.employee.findMany({
                 where: { id: { in: employeeIds } },
                 select: { id: true, firstName: true, lastName: true }
             })

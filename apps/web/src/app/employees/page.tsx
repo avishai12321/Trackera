@@ -38,7 +38,8 @@ export default function Employees() {
 
             const schema = await getCompanySchema();
             const { data, error } = await supabase
-                .from(`${schema}.users`)
+                .schema(schema)
+                .from('employees')
                 .select(`
                     *,
                     manager:manager_id (
@@ -63,7 +64,7 @@ export default function Employees() {
         setError('');
 
         try {
-            const { error } = await insertCompanyTable('users', {
+            const { error } = await insertCompanyTable('employees', {
                 first_name: firstName,
                 last_name: lastName,
                 email: email || null,
@@ -109,7 +110,7 @@ export default function Employees() {
         if (!confirm('Delete employee? This will affect all associated records.')) return;
 
         try {
-            const { error } = await deleteCompanyTable('users', id);
+            const { error } = await deleteCompanyTable('employees', id);
             if (error) throw error;
             fetchData();
         } catch (err: any) {
