@@ -2,30 +2,57 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '../../components/DashboardLayout';
-import { Plus, Trash2, Users } from 'lucide-react';
-import { supabase, getCompanySchema, insertCompanyTable, deleteCompanyTable } from '@/lib/supabase';
+import { Plus, Trash2, Edit2, X, Check } from 'lucide-react';
+import { supabase, getCompanySchema, insertCompanyTable, updateCompanyTable, deleteCompanyTable } from '@/lib/supabase';
+
+interface Employee {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string | null;
+    employee_code: string | null;
+    position: string | null;
+    department: string | null;
+    level: string | null;
+    salary: number | null;
+    currency: string | null;
+    hourly_rate: number | null;
+    manager_id: string | null;
+    monthly_capacity: number | null;
+    years_of_experience: number | null;
+    hire_date: string | null;
+    status: string;
+    manager?: { id: string; first_name: string; last_name: string } | null;
+}
 
 export default function Employees() {
     const router = useRouter();
-    const [employees, setEmployees] = useState([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
 
-    // Form state
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [email, setEmail] = useState('');
-    const [employeeCode, setEmployeeCode] = useState('');
-    const [position, setPosition] = useState('');
-    const [department, setDepartment] = useState('');
-    const [level, setLevel] = useState('');
-    const [salary, setSalary] = useState('');
-    const [currency, setCurrency] = useState('USD');
-    const [hourlyRate, setHourlyRate] = useState('');
-    const [managerId, setManagerId] = useState('');
-    const [monthlyCapacity, setMonthlyCapacity] = useState('160');
-    const [yearsOfExperience, setYearsOfExperience] = useState('');
-    const [hireDate, setHireDate] = useState('');
+    // Form state for adding
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        employeeCode: '',
+        position: '',
+        department: '',
+        level: '',
+        salary: '',
+        currency: 'USD',
+        hourlyRate: '',
+        managerId: '',
+        monthlyCapacity: '160',
+        yearsOfExperience: '',
+        hireDate: '',
+    });
+
+    // Edit state
+    const [editData, setEditData] = useState<Partial<Employee>>({});
 
     useEffect(() => {
         fetchData();
@@ -59,50 +86,106 @@ export default function Employees() {
         }
     };
 
+    const resetForm = () => {
+        setFormData({
+            firstName: '',
+            lastName: '',
+            email: '',
+            employeeCode: '',
+            position: '',
+            department: '',
+            level: '',
+            salary: '',
+            currency: 'USD',
+            hourlyRate: '',
+            managerId: '',
+            monthlyCapacity: '160',
+            yearsOfExperience: '',
+            hireDate: '',
+        });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
         try {
-            const { error } = await insertCompanyTable('employees', {
-                first_name: firstName,
-                last_name: lastName,
-                email: email || null,
-                employee_code: employeeCode || null,
-                position: position || null,
-                department: department || null,
-                level: level || null,
-                salary: salary ? parseFloat(salary) : null,
-                currency: currency || 'USD',
-                hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
-                manager_id: managerId || null,
-                monthly_capacity: monthlyCapacity ? parseFloat(monthlyCapacity) : 160,
-                years_of_experience: yearsOfExperience ? parseFloat(yearsOfExperience) : null,
-                hire_date: hireDate || null,
+            await insertCompanyTable('employees', {
+                first_name: formData.firstName,
+                last_name: formData.lastName,
+                email: formData.email || null,
+                employee_code: formData.employeeCode || null,
+                position: formData.position || null,
+                department: formData.department || null,
+                level: formData.level || null,
+                salary: formData.salary ? parseFloat(formData.salary) : null,
+                currency: formData.currency || 'USD',
+                hourly_rate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+                manager_id: formData.managerId || null,
+                monthly_capacity: formData.monthlyCapacity ? parseFloat(formData.monthlyCapacity) : 160,
+                years_of_experience: formData.yearsOfExperience ? parseFloat(formData.yearsOfExperience) : null,
+                hire_date: formData.hireDate || null,
                 status: 'ACTIVE'
             });
 
-            if (error) throw error;
-
-            // Reset form
-            setFirstName('');
-            setLastName('');
-            setEmail('');
-            setEmployeeCode('');
-            setPosition('');
-            setDepartment('');
-            setLevel('');
-            setSalary('');
-            setCurrency('USD');
-            setHourlyRate('');
-            setManagerId('');
-            setMonthlyCapacity('160');
-            setYearsOfExperience('');
-            setHireDate('');
-
+            resetForm();
+            setShowAddForm(false);
             fetchData();
         } catch (err: any) {
             setError(err.message || 'Failed to create employee');
+        }
+    };
+
+    const startEdit = (employee: Employee) => {
+        setEditingId(employee.id);
+        setEditData({
+            first_name: employee.first_name,
+            last_name: employee.last_name,
+            email: employee.email,
+            employee_code: employee.employee_code,
+            position: employee.position,
+            department: employee.department,
+            level: employee.level,
+            salary: employee.salary,
+            currency: employee.currency,
+            hourly_rate: employee.hourly_rate,
+            manager_id: employee.manager_id,
+            monthly_capacity: employee.monthly_capacity,
+            years_of_experience: employee.years_of_experience,
+            hire_date: employee.hire_date,
+            status: employee.status,
+        });
+    };
+
+    const cancelEdit = () => {
+        setEditingId(null);
+        setEditData({});
+    };
+
+    const saveEdit = async (id: string) => {
+        try {
+            await updateCompanyTable('employees', id, {
+                first_name: editData.first_name,
+                last_name: editData.last_name,
+                email: editData.email || null,
+                employee_code: editData.employee_code || null,
+                position: editData.position || null,
+                department: editData.department || null,
+                level: editData.level || null,
+                salary: editData.salary || null,
+                currency: editData.currency || 'USD',
+                hourly_rate: editData.hourly_rate || null,
+                manager_id: editData.manager_id || null,
+                monthly_capacity: editData.monthly_capacity || 160,
+                years_of_experience: editData.years_of_experience || null,
+                hire_date: editData.hire_date || null,
+                status: editData.status || 'ACTIVE',
+            });
+            setEditingId(null);
+            setEditData({});
+            fetchData();
+        } catch (err: any) {
+            alert('Failed to update employee: ' + err.message);
         }
     };
 
@@ -110,8 +193,7 @@ export default function Employees() {
         if (!confirm('Delete employee? This will affect all associated records.')) return;
 
         try {
-            const { error } = await deleteCompanyTable('employees', id);
-            if (error) throw error;
+            await deleteCompanyTable('employees', id);
             fetchData();
         } catch (err: any) {
             alert('Cannot delete employee: they may have associated time entries or be assigned to projects.');
@@ -122,189 +204,354 @@ export default function Employees() {
 
     return (
         <DashboardLayout>
+            {/* Header with Add Button */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
                     <h1>Employees</h1>
                     <p style={{ color: '#64748b' }}>Manage your team members and their information.</p>
                 </div>
-            </div>
-
-            {/* Add Employee Form */}
-            <div className="card" style={{ marginBottom: '2rem' }}>
-                <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                    onClick={() => setShowAddForm(true)}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                >
                     <Plus size={18} /> Add Employee
-                </h3>
-                {error && <p style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.875rem' }}>{String(error)}</p>}
-
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                    {/* Personal Information */}
-                    <div>
-                        <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Personal Information</h4>
-                        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>First Name *</label>
-                                <input type="text" placeholder="John" value={firstName} onChange={e => setFirstName(e.target.value)} required />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Last Name *</label>
-                                <input type="text" placeholder="Doe" value={lastName} onChange={e => setLastName(e.target.value)} required />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Email</label>
-                                <input type="email" placeholder="john.doe@example.com" value={email} onChange={e => setEmail(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Employee Code</label>
-                                <input type="text" placeholder="EMP-001" value={employeeCode} onChange={e => setEmployeeCode(e.target.value)} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Job Information */}
-                    <div>
-                        <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Job Information</h4>
-                        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Position</label>
-                                <input type="text" placeholder="Software Engineer" value={position} onChange={e => setPosition(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Department</label>
-                                <input type="text" placeholder="Engineering" value={department} onChange={e => setDepartment(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Level</label>
-                                <select value={level} onChange={e => setLevel(e.target.value)}>
-                                    <option value="">Select Level</option>
-                                    <option value="Junior">Junior</option>
-                                    <option value="Mid">Mid</option>
-                                    <option value="Senior">Senior</option>
-                                    <option value="Lead">Lead</option>
-                                    <option value="Principal">Principal</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Manager</label>
-                                <select value={managerId} onChange={e => setManagerId(e.target.value)}>
-                                    <option value="">No Manager</option>
-                                    {employees.map((emp: any) => (
-                                        <option key={emp.id} value={emp.id}>
-                                            {emp.first_name} {emp.last_name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Compensation & Capacity */}
-                    <div>
-                        <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Compensation & Capacity</h4>
-                        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Salary</label>
-                                <input type="number" step="0.01" placeholder="75000.00" value={salary} onChange={e => setSalary(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hourly Rate</label>
-                                <input type="number" step="0.01" placeholder="50.00" value={hourlyRate} onChange={e => setHourlyRate(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
-                                <select value={currency} onChange={e => setCurrency(e.target.value)}>
-                                    <option value="USD">USD</option>
-                                    <option value="EUR">EUR</option>
-                                    <option value="GBP">GBP</option>
-                                    <option value="ILS">ILS</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Monthly Capacity (hours)</label>
-                                <input type="number" step="0.01" placeholder="160" value={monthlyCapacity} onChange={e => setMonthlyCapacity(e.target.value)} />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Experience & Hiring */}
-                    <div>
-                        <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Experience & Hiring</h4>
-                        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Years of Experience</label>
-                                <input type="number" step="0.1" placeholder="5.5" value={yearsOfExperience} onChange={e => setYearsOfExperience(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hire Date</label>
-                                <input type="date" value={hireDate} onChange={e => setHireDate(e.target.value)} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <button type="submit" className="btn btn-primary">
-                            <Plus size={18} /> Add Employee
-                        </button>
-                    </div>
-                </form>
+                </button>
             </div>
 
-            {/* Employees Table */}
-            <div className="card">
-                <h3 style={{ marginBottom: '1rem' }}>All Employees</h3>
-                <div className="table-container" style={{ border: 'none' }}>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Position</th>
-                                <th>Department</th>
-                                <th>Manager</th>
-                                <th>Monthly Capacity</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {employees.map((employee: any) => (
-                                <tr key={employee.id}>
-                                    <td style={{ fontWeight: 500 }}>
-                                        {employee.first_name} {employee.last_name}
-                                        {employee.employee_code && (
-                                            <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '0.5rem', fontSize: '0.75rem' }}>
-                                                {employee.employee_code}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td>{employee.position || '-'}</td>
-                                    <td>{employee.department || '-'}</td>
-                                    <td>
-                                        {employee.manager ? (
-                                            <span>{employee.manager.first_name} {employee.manager.last_name}</span>
-                                        ) : '-'}
-                                    </td>
-                                    <td>{employee.monthly_capacity || 160} hrs</td>
-                                    <td>
-                                        <span style={{
-                                            padding: '2px 8px',
-                                            borderRadius: '999px',
-                                            fontSize: '0.75rem',
-                                            background: employee.status === 'ACTIVE' ? '#dbeafe' : '#fee2e2',
-                                            color: employee.status === 'ACTIVE' ? '#1e40af' : '#991b1b'
-                                        }}>
-                                            {employee.status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <button onClick={() => handleDelete(employee.id)} className="btn btn-danger" style={{ padding: '0.25rem 0.5rem' }}>
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </td>
+            {/* Employees Table - Main Content */}
+            <div className="card" style={{ overflow: 'hidden' }}>
+                <h3 style={{ marginBottom: '1rem' }}>All Employees ({employees.length})</h3>
+                {employees.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                        <p>No employees yet. Click "Add Employee" to create your first one.</p>
+                    </div>
+                ) : (
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
+                        <table style={{ width: '100%' }}>
+                            <thead>
+                                <tr>
+                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>Actions</th>
+                                    <th>Name</th>
+                                    <th>Position</th>
+                                    <th>Department</th>
+                                    <th>Level</th>
+                                    <th>Manager</th>
+                                    <th>Email</th>
+                                    <th>Capacity</th>
+                                    <th>Hire Date</th>
+                                    <th>Status</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                {employees.map((employee) => (
+                                    <tr key={employee.id}>
+                                        {editingId === employee.id ? (
+                                            <>
+                                                <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
+                                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                                        <button onClick={() => saveEdit(employee.id)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#10b981', color: 'white' }}>
+                                                            <Check size={14} />
+                                                        </button>
+                                                        <button onClick={cancelEdit} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#6b7280', color: 'white' }}>
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                                        <input
+                                                            type="text"
+                                                            value={editData.first_name || ''}
+                                                            onChange={e => setEditData({...editData, first_name: e.target.value})}
+                                                            style={{ width: '70px', padding: '0.25rem' }}
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            value={editData.last_name || ''}
+                                                            onChange={e => setEditData({...editData, last_name: e.target.value})}
+                                                            style={{ width: '70px', padding: '0.25rem' }}
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={editData.position || ''}
+                                                        onChange={e => setEditData({...editData, position: e.target.value})}
+                                                        style={{ width: '100px', padding: '0.25rem' }}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="text"
+                                                        value={editData.department || ''}
+                                                        onChange={e => setEditData({...editData, department: e.target.value})}
+                                                        style={{ width: '100px', padding: '0.25rem' }}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <select
+                                                        value={editData.level || ''}
+                                                        onChange={e => setEditData({...editData, level: e.target.value})}
+                                                        style={{ width: '80px', padding: '0.25rem' }}
+                                                    >
+                                                        <option value="">-</option>
+                                                        <option value="Junior">Junior</option>
+                                                        <option value="Mid">Mid</option>
+                                                        <option value="Senior">Senior</option>
+                                                        <option value="Lead">Lead</option>
+                                                        <option value="Principal">Principal</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <select
+                                                        value={editData.manager_id || ''}
+                                                        onChange={e => setEditData({...editData, manager_id: e.target.value})}
+                                                        style={{ width: '100px', padding: '0.25rem' }}
+                                                    >
+                                                        <option value="">-</option>
+                                                        {employees.filter(e => e.id !== employee.id).map((emp) => (
+                                                            <option key={emp.id} value={emp.id}>
+                                                                {emp.first_name} {emp.last_name}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="email"
+                                                        value={editData.email || ''}
+                                                        onChange={e => setEditData({...editData, email: e.target.value})}
+                                                        style={{ width: '140px', padding: '0.25rem' }}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="number"
+                                                        value={editData.monthly_capacity || ''}
+                                                        onChange={e => setEditData({...editData, monthly_capacity: e.target.value ? parseFloat(e.target.value) : null})}
+                                                        style={{ width: '60px', padding: '0.25rem' }}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        type="date"
+                                                        value={editData.hire_date || ''}
+                                                        onChange={e => setEditData({...editData, hire_date: e.target.value})}
+                                                        style={{ width: '120px', padding: '0.25rem' }}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <select
+                                                        value={editData.status || 'ACTIVE'}
+                                                        onChange={e => setEditData({...editData, status: e.target.value})}
+                                                        style={{ width: '80px', padding: '0.25rem' }}
+                                                    >
+                                                        <option value="ACTIVE">ACTIVE</option>
+                                                        <option value="INACTIVE">INACTIVE</option>
+                                                    </select>
+                                                </td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
+                                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                                        <button onClick={() => startEdit(employee)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#3b82f6', color: 'white' }}>
+                                                            <Edit2 size={14} />
+                                                        </button>
+                                                        <button onClick={() => handleDelete(employee.id)} className="btn btn-danger" style={{ padding: '0.25rem 0.5rem' }}>
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td style={{ fontWeight: 500 }}>
+                                                    {employee.first_name} {employee.last_name}
+                                                </td>
+                                                <td>{employee.position || '-'}</td>
+                                                <td>{employee.department || '-'}</td>
+                                                <td>{employee.level || '-'}</td>
+                                                <td>
+                                                    {employee.manager ? (
+                                                        <span>{employee.manager.first_name} {employee.manager.last_name}</span>
+                                                    ) : '-'}
+                                                </td>
+                                                <td style={{ fontSize: '0.875rem' }}>{employee.email || '-'}</td>
+                                                <td>{employee.monthly_capacity || 160} hrs</td>
+                                                <td style={{ fontSize: '0.875rem' }}>
+                                                    {employee.hire_date ? new Date(employee.hire_date).toLocaleDateString() : '-'}
+                                                </td>
+                                                <td>
+                                                    <span style={{
+                                                        padding: '2px 8px',
+                                                        borderRadius: '999px',
+                                                        fontSize: '0.75rem',
+                                                        background: employee.status === 'ACTIVE' ? '#dbeafe' : '#fee2e2',
+                                                        color: employee.status === 'ACTIVE' ? '#1e40af' : '#991b1b'
+                                                    }}>
+                                                        {employee.status}
+                                                    </span>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
+
+            {/* Add Employee Modal */}
+            {showAddForm && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '8px',
+                        padding: '2rem',
+                        maxWidth: '800px',
+                        width: '90%',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Plus size={18} /> Add Employee
+                            </h3>
+                            <button onClick={() => { setShowAddForm(false); resetForm(); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        {error && <p style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.875rem' }}>{String(error)}</p>}
+
+                        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                            {/* Personal Information */}
+                            <div>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Personal Information</h4>
+                                <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>First Name *</label>
+                                        <input type="text" placeholder="John" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} required />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Last Name *</label>
+                                        <input type="text" placeholder="Doe" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} required />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Email</label>
+                                        <input type="email" placeholder="john.doe@example.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Employee Code</label>
+                                        <input type="text" placeholder="EMP-001" value={formData.employeeCode} onChange={e => setFormData({...formData, employeeCode: e.target.value})} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Job Information */}
+                            <div>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Job Information</h4>
+                                <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Position</label>
+                                        <input type="text" placeholder="Software Engineer" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Department</label>
+                                        <input type="text" placeholder="Engineering" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Level</label>
+                                        <select value={formData.level} onChange={e => setFormData({...formData, level: e.target.value})}>
+                                            <option value="">Select Level</option>
+                                            <option value="Junior">Junior</option>
+                                            <option value="Mid">Mid</option>
+                                            <option value="Senior">Senior</option>
+                                            <option value="Lead">Lead</option>
+                                            <option value="Principal">Principal</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Manager</label>
+                                        <select value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})}>
+                                            <option value="">No Manager</option>
+                                            {employees.map((emp) => (
+                                                <option key={emp.id} value={emp.id}>
+                                                    {emp.first_name} {emp.last_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Compensation & Capacity */}
+                            <div>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Compensation & Capacity</h4>
+                                <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Salary</label>
+                                        <input type="number" step="0.01" placeholder="75000.00" value={formData.salary} onChange={e => setFormData({...formData, salary: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hourly Rate</label>
+                                        <input type="number" step="0.01" placeholder="50.00" value={formData.hourlyRate} onChange={e => setFormData({...formData, hourlyRate: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
+                                        <select value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
+                                            <option value="USD">USD</option>
+                                            <option value="EUR">EUR</option>
+                                            <option value="GBP">GBP</option>
+                                            <option value="ILS">ILS</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Monthly Capacity (hours)</label>
+                                        <input type="number" step="0.01" placeholder="160" value={formData.monthlyCapacity} onChange={e => setFormData({...formData, monthlyCapacity: e.target.value})} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Experience & Hiring */}
+                            <div>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Experience & Hiring</h4>
+                                <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Years of Experience</label>
+                                        <input type="number" step="0.1" placeholder="5.5" value={formData.yearsOfExperience} onChange={e => setFormData({...formData, yearsOfExperience: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hire Date</label>
+                                        <input type="date" value={formData.hireDate} onChange={e => setFormData({...formData, hireDate: e.target.value})} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                                <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} className="btn" style={{ background: '#e2e8f0' }}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn btn-primary">
+                                    <Plus size={18} /> Add Employee
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </DashboardLayout>
     );
 }

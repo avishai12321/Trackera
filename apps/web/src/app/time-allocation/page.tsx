@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '../../components/DashboardLayout';
-import { ClipboardList, Save, Grid3x3, FolderKanban } from 'lucide-react';
+import { Save, Grid3x3, FolderKanban, ChevronLeft, ChevronRight, Eye, EyeOff, Settings } from 'lucide-react';
 import { supabase, getCompanySchema } from '@/lib/supabase';
 
 type ViewMode = 'overview' | 'project';
@@ -39,12 +39,26 @@ interface Allocation {
     [key: string]: number; // "projectId_employeeId_year_month" -> hours
 }
 
+interface MonthlyAvailableHours {
+    [key: string]: number; // "employeeId_year_month" -> available hours
+}
+
 export default function TimeAllocation() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
     const [selectedProjectId, setSelectedProjectId] = useState<string>('');
+
+    // Current month for single-month view
+    const [currentMonth, setCurrentMonth] = useState<MonthInfo>(() => {
+        const today = new Date();
+        return {
+            year: today.getFullYear(),
+            month: today.getMonth() + 1,
+            label: today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        };
+    });
 
     // Data
     const [projects, setProjects] = useState<Project[]>([]);
@@ -53,13 +67,20 @@ export default function TimeAllocation() {
     const [allocations, setAllocations] = useState<Allocation>({});
     const [loggedHours, setLoggedHours] = useState<{ [projectId: string]: number }>({});
 
+    // Hidden employees (for hide/show column feature)
+    const [hiddenEmployees, setHiddenEmployees] = useState<Set<string>>(new Set());
+    const [showEmployeeSettings, setShowEmployeeSettings] = useState(false);
+
+    // Monthly available hours per employee (editable)
+    const [monthlyAvailableHours, setMonthlyAvailableHours] = useState<MonthlyAvailableHours>({});
+
     useEffect(() => {
         fetchData();
     }, []);
 
     useEffect(() => {
         generateMonths();
-    }, [viewMode, selectedProjectId, projects]);
+    }, [viewMode, selectedProjectId, projects, currentMonth]);
 
     const fetchData = async () => {
         try {
@@ -140,16 +161,8 @@ export default function TimeAllocation() {
         const monthsList: MonthInfo[] = [];
 
         if (viewMode === 'overview') {
-            // Show next 3 months
-            const today = new Date();
-            for (let i = 0; i < 3; i++) {
-                const date = new Date(today.getFullYear(), today.getMonth() + i, 1);
-                monthsList.push({
-                    year: date.getFullYear(),
-                    month: date.getMonth() + 1,
-                    label: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                });
-            }
+            // Show only the current selected month
+            monthsList.push(currentMonth);
         } else {
             // Project view: show all months from project start to end
             const selectedProject = projects.find(p => p.id === selectedProjectId);
@@ -183,6 +196,24 @@ export default function TimeAllocation() {
         }
 
         setMonths(monthsList);
+    };
+
+    const goToPrevMonth = () => {
+        const date = new Date(currentMonth.year, currentMonth.month - 2, 1);
+        setCurrentMonth({
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+            label: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        });
+    };
+
+    const goToNextMonth = () => {
+        const date = new Date(currentMonth.year, currentMonth.month, 1);
+        setCurrentMonth({
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+            label: date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+        });
     };
 
     const getAllocationKey = (projectId: string, employeeId: string, year: number, month: number) => {
@@ -262,6 +293,41 @@ export default function TimeAllocation() {
         if (percentage >= 90) return '#fef3c7'; // yellow
         return '#dcfce7'; // green
     };
+
+    // Get available hours for an employee for a specific month
+    const getAvailableHoursKey = (employeeId: string, year: number, month: number) => {
+        return `${employeeId}_${year}_${month}`;
+    };
+
+    const getAvailableHours = (employeeId: string, year: number, month: number): number => {
+        const key = getAvailableHoursKey(employeeId, year, month);
+        const employee = employees.find(e => e.id === employeeId);
+        return monthlyAvailableHours[key] ?? (employee?.monthly_capacity || 160);
+    };
+
+    const updateAvailableHours = (employeeId: string, year: number, month: number, hours: number) => {
+        const key = getAvailableHoursKey(employeeId, year, month);
+        setMonthlyAvailableHours(prev => ({
+            ...prev,
+            [key]: hours
+        }));
+    };
+
+    // Toggle employee visibility
+    const toggleEmployeeVisibility = (employeeId: string) => {
+        setHiddenEmployees(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(employeeId)) {
+                newSet.delete(employeeId);
+            } else {
+                newSet.add(employeeId);
+            }
+            return newSet;
+        });
+    };
+
+    // Get visible employees
+    const visibleEmployees = employees.filter(emp => !hiddenEmployees.has(emp.id));
 
     const handleSave = async () => {
         setSaving(true);
@@ -360,138 +426,184 @@ export default function TimeAllocation() {
             {/* Overview Mode Grid */}
             {viewMode === 'overview' && (
                 <div className="card">
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={{ minWidth: '100%', fontSize: '0.875rem' }}>
-                            <thead>
-                                <tr>
-                                    <th style={{ position: 'sticky', left: 0, background: 'white', zIndex: 2, minWidth: '200px' }}>Project</th>
-                                    <th style={{ minWidth: '80px' }}>Logged</th>
-                                    {months.map(m => (
-                                        <th key={`${m.year}-${m.month}`} colSpan={employees.length} style={{ textAlign: 'center', background: '#f8fafc' }}>
-                                            {m.label}
-                                        </th>
-                                    ))}
-                                    <th style={{ minWidth: '80px' }}>Total</th>
-                                    <th style={{ minWidth: '100px' }}>Income</th>
-                                </tr>
-                                <tr>
-                                    <th style={{ position: 'sticky', left: 0, background: 'white', zIndex: 2 }}></th>
-                                    <th></th>
-                                    {months.map(m => (
-                                        employees.map(emp => (
-                                            <th key={`${m.year}-${m.month}-${emp.id}`} style={{ fontSize: '0.75rem', fontWeight: 400, color: '#64748b' }}>
-                                                {emp.first_name.charAt(0)}{emp.last_name.charAt(0)}
-                                            </th>
-                                        ))
-                                    ))}
-                                    <th></th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {projects.map(project => (
-                                    <tr key={project.id}>
-                                        <td style={{ position: 'sticky', left: 0, background: 'white', fontWeight: 500, zIndex: 1 }}>
-                                            {project.name}
-                                            {project.code && (
-                                                <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', marginLeft: '0.5rem', fontSize: '0.75rem' }}>
-                                                    {project.code}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td style={{ textAlign: 'center', color: '#64748b' }}>
-                                            {loggedHours[project.id] ? Math.round(loggedHours[project.id]) : 0}
-                                        </td>
-                                        {months.map(m => (
-                                            employees.map(emp => (
-                                                <td key={`${project.id}-${m.year}-${m.month}-${emp.id}`} style={{ padding: '0.25rem' }}>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={getAllocation(project.id, emp.id, m.year, m.month) || ''}
-                                                        onChange={e => updateAllocation(project.id, emp.id, m.year, m.month, parseFloat(e.target.value) || 0)}
-                                                        style={{
-                                                            width: '60px',
-                                                            padding: '0.25rem',
-                                                            textAlign: 'center',
-                                                            border: '1px solid #e2e8f0',
-                                                            borderRadius: '4px'
-                                                        }}
-                                                        placeholder="0"
-                                                    />
-                                                </td>
-                                            ))
-                                        ))}
-                                        <td style={{ textAlign: 'center', fontWeight: 600 }}>
-                                            {Math.round(getProjectTotal(project.id))}
-                                        </td>
-                                        <td style={{ textAlign: 'right', fontWeight: 600 }}>
-                                            {project.currency || 'USD'} {Math.round(calculateProjectIncome(project)).toLocaleString()}
-                                        </td>
-                                    </tr>
-                                ))}
-                                <tr style={{ borderTop: '2px solid #e2e8f0', fontWeight: 600 }}>
-                                    <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>Employee Total</td>
-                                    <td></td>
-                                    {months.map(m => (
-                                        employees.map(emp => {
-                                            const total = getEmployeeMonthlyTotal(emp.id, m.year, m.month);
-                                            const capacity = emp.monthly_capacity || 160;
-                                            return (
-                                                <td
-                                                    key={`total-${m.year}-${m.month}-${emp.id}`}
-                                                    style={{
-                                                        textAlign: 'center',
-                                                        background: getCapacityColor(total, capacity),
-                                                        fontSize: '0.75rem'
-                                                    }}
-                                                >
-                                                    {Math.round(total)}
-                                                </td>
-                                            );
-                                        })
-                                    ))}
-                                    <td colSpan={2}></td>
-                                </tr>
-                                <tr style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                    <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>Capacity</td>
-                                    <td></td>
-                                    {months.map(m => (
-                                        employees.map(emp => (
-                                            <td key={`capacity-${m.year}-${m.month}-${emp.id}`} style={{ textAlign: 'center' }}>
-                                                {emp.monthly_capacity || 160}
-                                            </td>
-                                        ))
-                                    ))}
-                                    <td colSpan={2}></td>
-                                </tr>
-                                <tr style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                    <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>% Used</td>
-                                    <td></td>
-                                    {months.map(m => (
-                                        employees.map(emp => {
-                                            const total = getEmployeeMonthlyTotal(emp.id, m.year, m.month);
-                                            const capacity = emp.monthly_capacity || 160;
-                                            const percentage = Math.round((total / capacity) * 100);
-                                            return (
-                                                <td key={`percent-${m.year}-${m.month}-${emp.id}`} style={{ textAlign: 'center' }}>
-                                                    {percentage}%
-                                                </td>
-                                            );
-                                        })
-                                    ))}
-                                    <td colSpan={2}></td>
-                                </tr>
-                            </tbody>
-                        </table>
+                    {/* Month Navigation + Employee Settings */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <button
+                                onClick={goToPrevMonth}
+                                className="btn"
+                                style={{ padding: '0.4rem', display: 'flex', alignItems: 'center' }}
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                            <h3 style={{ minWidth: '180px', textAlign: 'center', margin: 0, fontSize: '1rem' }}>
+                                {currentMonth.label}
+                            </h3>
+                            <button
+                                onClick={goToNextMonth}
+                                className="btn"
+                                style={{ padding: '0.4rem', display: 'flex', alignItems: 'center' }}
+                            >
+                                <ChevronRight size={18} />
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => setShowEmployeeSettings(!showEmployeeSettings)}
+                            className="btn"
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}
+                        >
+                            <Settings size={16} />
+                            {showEmployeeSettings ? 'Hide' : 'Show'} Columns
+                        </button>
                     </div>
 
-                    <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', fontSize: '0.875rem' }}>
+                    {/* Employee Visibility Settings */}
+                    {showEmployeeSettings && (
+                        <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '6px', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            {employees.map(emp => (
+                                <button
+                                    key={emp.id}
+                                    onClick={() => toggleEmployeeVisibility(emp.id)}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.25rem',
+                                        padding: '0.25rem 0.5rem',
+                                        fontSize: '0.75rem',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: '4px',
+                                        background: hiddenEmployees.has(emp.id) ? '#fee2e2' : '#dcfce7',
+                                        color: hiddenEmployees.has(emp.id) ? '#991b1b' : '#166534',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {hiddenEmployees.has(emp.id) ? <EyeOff size={12} /> : <Eye size={12} />}
+                                    {emp.first_name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <table style={{ width: '100%', fontSize: '0.8rem' }}>
+                        <thead>
+                            <tr>
+                                <th style={{ minWidth: '140px', padding: '0.4rem' }}>Project</th>
+                                <th style={{ width: '50px', textAlign: 'center', padding: '0.4rem' }}>Log</th>
+                                {visibleEmployees.map(emp => (
+                                    <th key={emp.id} style={{ textAlign: 'center', padding: '0.4rem', minWidth: '70px' }}>
+                                        {emp.first_name}
+                                    </th>
+                                ))}
+                                <th style={{ width: '50px', textAlign: 'center', padding: '0.4rem' }}>Tot</th>
+                                <th style={{ width: '80px', textAlign: 'right', padding: '0.4rem' }}>Income</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {projects.map(project => (
+                                <tr key={project.id}>
+                                    <td style={{ fontWeight: 500, padding: '0.3rem', fontSize: '0.75rem' }}>
+                                        {project.name}
+                                    </td>
+                                    <td style={{ textAlign: 'center', color: '#64748b', padding: '0.3rem' }}>
+                                        {loggedHours[project.id] ? Math.round(loggedHours[project.id]) : 0}
+                                    </td>
+                                    {visibleEmployees.map(emp => (
+                                        <td key={`${project.id}-${emp.id}`} style={{ padding: '0.2rem', textAlign: 'center' }}>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.5"
+                                                value={getAllocation(project.id, emp.id, currentMonth.year, currentMonth.month) || ''}
+                                                onChange={e => updateAllocation(project.id, emp.id, currentMonth.year, currentMonth.month, parseFloat(e.target.value) || 0)}
+                                                style={{
+                                                    width: '50px',
+                                                    padding: '0.2rem',
+                                                    textAlign: 'center',
+                                                    border: '1px solid #e2e8f0',
+                                                    borderRadius: '3px',
+                                                    fontSize: '0.75rem'
+                                                }}
+                                                placeholder="0"
+                                            />
+                                        </td>
+                                    ))}
+                                    <td style={{ textAlign: 'center', fontWeight: 600, padding: '0.3rem' }}>
+                                        {Math.round(getProjectMonthTotal(project.id, currentMonth.year, currentMonth.month))}
+                                    </td>
+                                    <td style={{ textAlign: 'right', fontWeight: 600, padding: '0.3rem', fontSize: '0.75rem' }}>
+                                        {Math.round(calculateProjectIncome(project)).toLocaleString()}
+                                    </td>
+                                </tr>
+                            ))}
+                            <tr style={{ borderTop: '2px solid #e2e8f0', fontWeight: 600 }}>
+                                <td style={{ padding: '0.3rem' }}>Total</td>
+                                <td></td>
+                                {visibleEmployees.map(emp => {
+                                    const total = getEmployeeMonthlyTotal(emp.id, currentMonth.year, currentMonth.month);
+                                    const capacity = getAvailableHours(emp.id, currentMonth.year, currentMonth.month);
+                                    return (
+                                        <td
+                                            key={`total-${emp.id}`}
+                                            style={{
+                                                textAlign: 'center',
+                                                background: getCapacityColor(total, capacity),
+                                                padding: '0.3rem'
+                                            }}
+                                        >
+                                            {Math.round(total)}
+                                        </td>
+                                    );
+                                })}
+                                <td colSpan={2}></td>
+                            </tr>
+                            <tr style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                <td style={{ padding: '0.3rem' }}>Available Hrs</td>
+                                <td></td>
+                                {visibleEmployees.map(emp => (
+                                    <td key={`capacity-${emp.id}`} style={{ textAlign: 'center', padding: '0.2rem' }}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            value={getAvailableHours(emp.id, currentMonth.year, currentMonth.month)}
+                                            onChange={e => updateAvailableHours(emp.id, currentMonth.year, currentMonth.month, parseFloat(e.target.value) || 0)}
+                                            style={{
+                                                width: '50px',
+                                                padding: '0.15rem',
+                                                textAlign: 'center',
+                                                border: '1px solid #cbd5e1',
+                                                borderRadius: '3px',
+                                                fontSize: '0.7rem',
+                                                background: '#f8fafc'
+                                            }}
+                                        />
+                                    </td>
+                                ))}
+                                <td colSpan={2}></td>
+                            </tr>
+                            <tr style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                <td style={{ padding: '0.3rem' }}>Capacity</td>
+                                <td></td>
+                                {visibleEmployees.map(emp => {
+                                    const total = getEmployeeMonthlyTotal(emp.id, currentMonth.year, currentMonth.month);
+                                    const capacity = getAvailableHours(emp.id, currentMonth.year, currentMonth.month);
+                                    const percentage = capacity > 0 ? Math.round((total / capacity) * 100) : 0;
+                                    return (
+                                        <td key={`percent-${emp.id}`} style={{ textAlign: 'center', padding: '0.3rem' }}>
+                                            {percentage}%
+                                        </td>
+                                    );
+                                })}
+                                <td colSpan={2}></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: '#f8fafc', borderRadius: '6px', fontSize: '0.7rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                         <strong>Legend:</strong>
-                        <span style={{ marginLeft: '1rem', padding: '2px 8px', background: '#dcfce7', borderRadius: '4px' }}>Green: &lt;90% capacity</span>
-                        <span style={{ marginLeft: '0.5rem', padding: '2px 8px', background: '#fef3c7', borderRadius: '4px' }}>Yellow: 90-100% capacity</span>
-                        <span style={{ marginLeft: '0.5rem', padding: '2px 8px', background: '#fee2e2', borderRadius: '4px' }}>Red: &gt;100% capacity</span>
+                        <span style={{ padding: '2px 6px', background: '#dcfce7', borderRadius: '3px' }}>&lt;90%</span>
+                        <span style={{ padding: '2px 6px', background: '#fef3c7', borderRadius: '3px' }}>90-100%</span>
+                        <span style={{ padding: '2px 6px', background: '#fee2e2', borderRadius: '3px' }}>&gt;100%</span>
                     </div>
                 </div>
             )}
