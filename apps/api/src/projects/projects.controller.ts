@@ -5,7 +5,7 @@ import { TenantGuard } from '../common/guards/tenant.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { Role } from '../shared/enums';
 import { TenantContext } from '../shared/tenant-context';
 
 @Controller('projects')

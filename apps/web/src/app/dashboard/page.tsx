@@ -143,7 +143,7 @@ function CompanyOverviewTab() {
                 const { data: allocations } = await supabase
                     .schema(schema)
                     .from('time_allocations')
-                    .select('project_id, employee_id, hours');
+                    .select('project_id, employee_id, allocated_hours');
 
                 if (projects) {
                     const totalIncome = projects.reduce((sum, p) => sum + (p.total_budget || 0), 0);
@@ -170,7 +170,7 @@ function CompanyOverviewTab() {
                                 const projAllocs = allocations?.filter(
                                     (a: any) => a.employee_id === emp.id && a.project_id === proj.id
                                 ) || [];
-                                const totalHours = projAllocs.reduce((sum: number, a: any) => sum + (a.hours || 0), 0);
+                                const totalHours = projAllocs.reduce((sum: number, a: any) => sum + (a.allocated_hours || 0), 0);
                                 empData[proj.name] = totalHours;
                             });
                             return empData;
@@ -179,7 +179,7 @@ function CompanyOverviewTab() {
                     }
 
                     // Calculate capacity (total allocated / total available)
-                    const totalAllocated = allocations?.reduce((sum: number, a: any) => sum + (a.hours || 0), 0) || 0;
+                    const totalAllocated = allocations?.reduce((sum: number, a: any) => sum + (a.allocated_hours || 0), 0) || 0;
                     const totalCapacity = (employeesCount || 0) * 160; // 160 hrs/month per employee
                     const capacityPercent = totalCapacity > 0 ? Math.round((totalAllocated / totalCapacity) * 100) : 0;
 
@@ -366,8 +366,8 @@ function ProjectViewTab() {
                 .schema(schema)
                 .from('time_allocations')
                 .select(`
-                    hours,
-                    employee:user_id(first_name, last_name)
+                    allocated_hours,
+                    employee:employee_id(first_name, last_name)
                 `)
                 .eq('project_id', projectId);
 
@@ -376,7 +376,7 @@ function ProjectViewTab() {
                 allocations.forEach((a: any) => {
                     const name = `${a.employee?.first_name} ${a.employee?.last_name}`;
                     const current = distMap.get(name) || 0;
-                    distMap.set(name, current + a.hours);
+                    distMap.set(name, current + a.allocated_hours);
                 });
 
                 const distData = Array.from(distMap.entries()).map(([name, value]) => ({ name, value }));
@@ -530,16 +530,16 @@ function EmployeeOverviewTab() {
                     .schema(schema)
                     .from('time_allocations')
                     .select(`
-                        hours,
-                        user_id,
+                        allocated_hours,
+                        employee_id,
                         project:project_id(name)
                     `);
 
                 // Map allocations to employees
                 const enhancedEmployees = employeesData.map(emp => {
-                    const empAllocs = allocations?.filter((a: any) => a.user_id === emp.id) || [];
+                    const empAllocs = allocations?.filter((a: any) => a.employee_id === emp.id) || [];
                     const projectNames = Array.from(new Set(empAllocs.map((a: any) => a.project?.name))).join(', ');
-                    const totalPlanned = empAllocs.reduce((sum: number, a: any) => sum + (a.hours || 0), 0);
+                    const totalPlanned = empAllocs.reduce((sum: number, a: any) => sum + (a.allocated_hours || 0), 0);
 
                     return {
                         ...emp,
@@ -684,10 +684,10 @@ function EmployeeDeepDiveTab() {
                     .schema(schema)
                     .from('time_allocations')
                     .select(`
-                        hours,
+                        allocated_hours,
                         project:project_id(name)
                     `)
-                    .eq('user_id', empId);
+                    .eq('employee_id', empId);
 
                 const projectCount = allocations ? new Set(allocations.map((a: any) => a.project?.name)).size : 0;
 
@@ -702,7 +702,7 @@ function EmployeeDeepDiveTab() {
                 if (allocations) {
                     const data = allocations.map((a: any) => ({
                         name: a.project?.name || 'Unknown',
-                        hours: a.hours
+                        hours: a.allocated_hours
                     }));
                     setWorkloadData(data);
                 }

@@ -10,7 +10,8 @@ export default function TimeEntries() {
     const [entries, setEntries] = useState([]);
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [employeeId, setEmployeeId] = useState<string | null>(null);
+    const [tenantId, setTenantId] = useState<string | null>(null);
 
     // Form State
     const [description, setDescription] = useState('');
@@ -33,28 +34,42 @@ export default function TimeEntries() {
 
             const schema = await getCompanySchema();
             const user = await getCurrentUser();
-            setCurrentUserId(user?.dbUser?.id || null);
+            const companyId = session.user.user_metadata?.company_id;
+            setTenantId(companyId || null);
+
+            // Fetch employee record for current user (to get employee ID for time entries)
+            const { data: employeeData } = await supabase
+                .schema(schema)
+                .from('employees')
+                .select('id')
+                .eq('user_id', user?.id)
+                .single();
+
+            setEmployeeId(employeeData?.id || null);
 
             // Fetch projects
             const { data: projectsData } = await supabase
-                .from(`${schema}.projects`)
+                .schema(schema)
+                .from('projects')
                 .select('*')
-                .eq('status', 'active')
-                .order('project_name');
+                .eq('status', 'ACTIVE')
+                .order('name');
 
-            // Fetch time entries with related data
+            // Fetch time entries from company schema
             const { data: entriesData } = await supabase
-                .from(`${schema}.time_entries`)
+                .schema(schema)
+                .from('time_entries')
                 .select(`
                     id,
                     description,
+                    date,
                     start_time,
-                    duration_minutes,
-                    is_billable,
-                    project:project_id (id, project_name),
-                    user:user_id (id, first_name, last_name)
+                    minutes,
+                    billable,
+                    project_id,
+                    employee_id
                 `)
-                .order('start_time', { ascending: false });
+                .order('date', { ascending: false });
 
             setProjects(projectsData || []);
             setEntries(entriesData || []);
@@ -68,22 +83,30 @@ export default function TimeEntries() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!currentUserId) {
-            alert('User not found');
+        if (!employeeId || !tenantId) {
+            alert('Employee or tenant not found. Make sure your user account is linked to an employee record.');
             return;
         }
 
         try {
-            const { error } = await insertCompanyTable('time_entries', {
-                user_id: currentUserId,
+            // Parse datetime-local value to separate date and time for company schema
+            const dateTimeValue = new Date(startTime);
+            const dateStr = dateTimeValue.toISOString().split('T')[0]; // YYYY-MM-DD
+            const timeStr = dateTimeValue.toTimeString().split(' ')[0]; // HH:MM:SS
+            const mins = parseInt(duration);
+
+            await insertCompanyTable('time_entries', {
+                tenant_id: tenantId,
+                employee_id: employeeId,
                 project_id: projectId,
                 description,
-                start_time: new Date(startTime).toISOString(),
-                duration_minutes: parseInt(duration),
-                is_billable: isBillable
+                date: dateStr,
+                start_time: timeStr,
+                minutes: mins,
+                hours: mins / 60,
+                billable: isBillable,
+                source: 'MANUAL'
             });
-
-            if (error) throw error;
 
             // Reset form and reload
             setDescription('');
@@ -99,8 +122,7 @@ export default function TimeEntries() {
     const handleDelete = async (id: string) => {
         if (!confirm('Delete entry?')) return;
         try {
-            const { error } = await deleteCompanyTable('time_entries', id);
-            if (error) throw error;
+            await deleteCompanyTable('time_entries', id);
             fetchData();
         } catch (err) {
             alert('Delete failed');
@@ -128,7 +150,7 @@ export default function TimeEntries() {
                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Project</label>
                             <select value={projectId} onChange={e => setProjectId(e.target.value)} required>
                                 <option value="">Select Project</option>
-                                {projects.map((p: any) => <option key={p.id} value={p.id}>{p.project_name}</option>)}
+                                {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                         </div>
                         <div>
@@ -177,18 +199,18 @@ export default function TimeEntries() {
                             {entries.map((e: any) => (
                                 <tr key={e.id}>
                                     <td>{new Date(e.start_time).toLocaleDateString()}</td>
-                                    <td style={{ fontWeight: 500, color: '#4f46e5' }}>{e.project?.project_name || 'Unknown'}</td>
+                                    <td style={{ fontWeight: 500, color: '#4f46e5' }}>{projects.find((p: any) => p.id === e.project_id)?.name || 'Unknown'}</td>
                                     <td>{e.description || '-'}</td>
-                                    <td>{e.duration_minutes}m</td>
+                                    <td>{e.minutes}m</td>
                                     <td>
                                         <span style={{
                                             padding: '2px 8px',
                                             borderRadius: '999px',
                                             fontSize: '0.75rem',
-                                            background: e.is_billable ? '#d1fae5' : '#f3f4f6',
-                                            color: e.is_billable ? '#065f46' : '#374151'
+                                            background: e.billable ? '#d1fae5' : '#f3f4f6',
+                                            color: e.billable ? '#065f46' : '#374151'
                                         }}>
-                                            {e.is_billable ? 'Billable' : 'Non-Billable'}
+                                            {e.billable ? 'Billable' : 'Non-Billable'}
                                         </span>
                                     </td>
                                     <td>

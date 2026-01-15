@@ -5,7 +5,7 @@ import { TenantGuard } from '../common/guards/tenant.guard';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { TenantContext } from '../shared/tenant-context';
-import { Role } from '@prisma/client';
+import { Role } from '../shared/enums';
 
 @Controller('time-entries')
 @UseGuards(TenantGuard, AuthGuard('jwt'), RolesGuard)
@@ -34,13 +34,13 @@ export class TimeEntriesController {
     }
 
     @Get('suggestions')
-    getSuggestions(@Query('date') date: string, @Request() req: any) {
+    getSuggestions(@Query('startDate') startDate: string, @Query('endDate') endDate: string, @Request() req: any) {
         const tenantId = TenantContext.getTenantId();
         if (!tenantId) throw new Error('Tenant context missing');
 
-        if (!date) throw new BadRequestException('Date query parameter is required');
+        if (!startDate || !endDate) throw new BadRequestException('startDate and endDate query parameters are required');
 
-        return this.timeEntriesService.getSuggestions(tenantId, req.user.id, date);
+        return this.timeEntriesService.getSuggestions(tenantId, req.user.id, startDate, endDate);
     }
 
     @Get()

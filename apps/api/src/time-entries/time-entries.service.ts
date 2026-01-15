@@ -60,14 +60,16 @@ export class TimeEntriesService {
         return data;
     }
 
-    async getSuggestions(tenantId: string, userId: string, dateString: string) {
+    async getSuggestions(tenantId: string, userId: string, startDate: string, endDate: string) {
         // Safe date parsing (UTC)
-        const [year, month, day] = dateString.split('-').map(Number);
-        const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-        const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+        const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+        const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
 
-        this.logger.log(`Fetching suggestions for tenant: ${tenantId}, user: ${userId}, date: ${dateString}`);
-        this.logger.log(`Range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
+        const rangeStart = new Date(Date.UTC(startYear, startMonth - 1, startDay, 0, 0, 0, 0));
+        const rangeEnd = new Date(Date.UTC(endYear, endMonth - 1, endDay, 23, 59, 59, 999));
+
+        this.logger.log(`Fetching suggestions for tenant: ${tenantId}, user: ${userId}`);
+        this.logger.log(`Range: ${rangeStart.toISOString()} to ${rangeEnd.toISOString()}`);
 
         // 1. Get Calendar Events for this User (all connections)
         // We use !inner join to filter by connection.user_id
@@ -76,8 +78,8 @@ export class TimeEntriesService {
             .select('*, connection:calendar_connections!inner(user_id)')
             .eq('tenant_id', tenantId)
             .eq('connection.user_id', userId)
-            .gte('start_at', startOfDay.toISOString())
-            .lte('start_at', endOfDay.toISOString());
+            .gte('start_at', rangeStart.toISOString())
+            .lte('start_at', rangeEnd.toISOString());
 
         if (eventsError) {
             this.logger.error(`Join query failed: ${eventsError.message}. Trying fallback...`);
@@ -97,8 +99,8 @@ export class TimeEntriesService {
                 .select('*')
                 .eq('tenant_id', tenantId)
                 .in('connection_id', connIds)
-                .gte('start_at', startOfDay.toISOString())
-                .lte('start_at', endOfDay.toISOString());
+                .gte('start_at', rangeStart.toISOString())
+                .lte('start_at', rangeEnd.toISOString());
 
             if (fallbackError) {
                 this.logger.error('Fallback query also failed', fallbackError);
@@ -106,7 +108,7 @@ export class TimeEntriesService {
             }
 
             this.logger.log(`Found ${fallbackEvents?.length || 0} events via fallback`);
-            return this.processSuggestions(tenantId, userId, startOfDay, endOfDay, fallbackEvents || []);
+            return this.processSuggestions(tenantId, userId, rangeStart, rangeEnd, fallbackEvents || []);
         }
 
         this.logger.log(`Found ${calendarEvents?.length || 0} calendar events`);
@@ -115,7 +117,7 @@ export class TimeEntriesService {
             return [];
         }
 
-        return this.processSuggestions(tenantId, userId, startOfDay, endOfDay, calendarEvents);
+        return this.processSuggestions(tenantId, userId, rangeStart, rangeEnd, calendarEvents);
     }
 
     private async processSuggestions(tenantId: string, userId: string, startOfDay: Date, endOfDay: Date, calendarEvents: any[]) {

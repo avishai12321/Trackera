@@ -2,11 +2,8 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { SupabaseService } from '../shared/supabase.service';
 import { google } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
-// import { CalendarProvider, ConnectionStatus } from '@prisma/client'; // Removed Prisma enum imports
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
 
-// Define Enums locally if removed from Prisma or just use strings
+// Define Enums locally
 enum CalendarProvider {
     GOOGLE = 'GOOGLE',
     MICROSOFT = 'MICROSOFT'
@@ -23,10 +20,7 @@ export class CalendarService {
     private googleClient: OAuth2Client;
     private readonly logger = new Logger(CalendarService.name);
 
-    constructor(
-        private supabase: SupabaseService,
-        @InjectQueue('calendar-sync') private calendarSyncQueue: Queue
-    ) {
+    constructor(private supabase: SupabaseService) {
         this.googleClient = new google.auth.OAuth2(
             process.env.GOOGLE_CLIENT_ID,
             process.env.GOOGLE_CLIENT_SECRET,
@@ -34,8 +28,12 @@ export class CalendarService {
         );
     }
 
+    /**
+     * Trigger calendar sync - now runs synchronously (no queue)
+     */
     async enqueueSync(connectionId: string) {
-        await this.calendarSyncQueue.add('sync-events', { connectionId });
+        // Run sync directly instead of queuing
+        await this.syncEvents(connectionId);
     }
 
     async getConnections(tenantId: string, userId: string) {
@@ -203,7 +201,8 @@ export class CalendarService {
                     .update({ sync_cursor: null })
                     .eq('id', connectionId);
 
-                await this.calendarSyncQueue.add('sync-events', { connectionId });
+                // Retry sync directly instead of re-queuing
+                await this.syncEvents(connectionId);
             } else {
                 this.logger.error('Error syncing events', error);
                 throw error;

@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import axios from 'axios';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase, getCompanySchema } from '@/lib/supabase';
 import DashboardLayout from '../../components/DashboardLayout';
 import {
     Plus, Calendar as CalendarIcon, Loader, ChevronLeft, ChevronRight,
@@ -24,6 +24,12 @@ interface Project {
     id: string;
     name: string;
     code: string | null;
+}
+
+interface Employee {
+    id: string;
+    first_name: string;
+    last_name: string;
 }
 
 interface TimeSlot {
@@ -58,6 +64,7 @@ function CalendarContent() {
     // Data
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [employees, setEmployees] = useState<Employee[]>([]);
     const [connections, setConnections] = useState<any[]>([]);
     const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
     const [loading, setLoading] = useState(true);
@@ -150,14 +157,33 @@ function CalendarContent() {
         setLoading(true);
         try {
             const config = { headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId } };
+            const schema = await getCompanySchema();
 
             // Fetch connections
             const connRes = await axios.get('http://localhost:3000/calendar/connections', config);
             setConnections(connRes.data);
 
-            // Fetch projects
-            const pRes = await axios.get('http://localhost:3000/projects', config);
-            setProjects(pRes.data);
+            // Fetch projects from Supabase
+            const { data: projectsData, error: projectsError } = await supabase
+                .schema(schema)
+                .from('projects')
+                .select('id, name, code')
+                .eq('status', 'ACTIVE')
+                .order('name');
+
+            if (projectsError) throw projectsError;
+            setProjects(projectsData || []);
+
+            // Fetch employees from Supabase
+            const { data: employeesData, error: employeesError } = await supabase
+                .schema(schema)
+                .from('employees')
+                .select('id, first_name, last_name')
+                .eq('status', 'ACTIVE')
+                .order('first_name');
+
+            if (employeesError) throw employeesError;
+            setEmployees(employeesData || []);
 
             // Fetch calendar events for the week
             const startDate = currentWeekStart.toISOString().split('T')[0];
@@ -250,8 +276,8 @@ function CalendarContent() {
             const eventTotalMinutes = eventHour * 60 + eventMinute;
             const slotTotalMinutes = hour * 60 + minute;
             return eventStart.toDateString() === date.toDateString() &&
-                   eventTotalMinutes >= slotTotalMinutes &&
-                   eventTotalMinutes < slotTotalMinutes + slotDuration;
+                eventTotalMinutes >= slotTotalMinutes &&
+                eventTotalMinutes < slotTotalMinutes + slotDuration;
         });
     };
 
@@ -351,7 +377,7 @@ function CalendarContent() {
     };
 
     // Assign project to selected events
-    const assignProjectToSelected = async (projectId: string) => {
+    const assignProjectToSelected = async (projectId: string, employeeId: string, startTime: string, endTime: string) => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         const token = session.access_token;
@@ -361,12 +387,18 @@ function CalendarContent() {
             for (const slotId of selectedSlots) {
                 const event = calendarEvents.find(e => e.id === slotId);
                 if (event) {
+                    // Calculate duration from provided times
+                    const start = new Date(startTime);
+                    const end = new Date(endTime);
+                    const durationMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+
                     await axios.post('http://localhost:3000/time-entries', {
                         projectId,
+                        employeeId,
                         description: event.title,
-                        startTime: event.startTime,
-                        endTime: event.endTime,
-                        durationMinutes: event.durationMinutes,
+                        startTime,
+                        endTime,
+                        durationMinutes,
                         billable: true,
                         confirmed: false
                     }, {
@@ -400,7 +432,7 @@ function CalendarContent() {
     };
 
     // Add manual time slot
-    const addManualSlot = async (projectId: string, description: string) => {
+    const addManualSlot = async (projectId: string, employeeId: string, description: string) => {
         if (!addSlotData) return;
 
         const { data: { session } } = await supabase.auth.getSession();
@@ -426,6 +458,7 @@ function CalendarContent() {
         try {
             await axios.post('http://localhost:3000/time-entries', {
                 projectId,
+                employeeId,
                 description,
                 startTime: startTime.toISOString(),
                 endTime: endTime.toISOString(),
@@ -849,53 +882,14 @@ function CalendarContent() {
 
             {/* Project Assignment Modal */}
             {showProjectModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                }}>
-                    <div style={{
-                        background: 'white',
-                        borderRadius: '8px',
-                        padding: '1.5rem',
-                        maxWidth: '400px',
-                        width: '90%',
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                            <h3 style={{ margin: 0 }}>Assign to Project</h3>
-                            <button onClick={() => { setShowProjectModal(false); setSelectedSlots(new Set()); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <p style={{ color: '#64748b', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                            Select a project to assign {selectedSlots.size} meeting{selectedSlots.size > 1 ? 's' : ''} to:
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '300px', overflowY: 'auto' }}>
-                            {projects.map(project => (
-                                <button
-                                    key={project.id}
-                                    onClick={() => assignProjectToSelected(project.id)}
-                                    className="btn"
-                                    style={{
-                                        justifyContent: 'flex-start',
-                                        textAlign: 'left',
-                                        padding: '0.75rem 1rem'
-                                    }}
-                                >
-                                    <strong>{project.name}</strong>
-                                    {project.code && <span style={{ marginLeft: '0.5rem', color: '#64748b' }}>({project.code})</span>}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                <AssignModal
+                    selectedCount={selectedSlots.size}
+                    selectedEvents={Array.from(selectedSlots).map(id => calendarEvents.find(e => e.id === id)).filter(Boolean) as CalendarEvent[]}
+                    projects={projects}
+                    employees={employees}
+                    onClose={() => { setShowProjectModal(false); setSelectedSlots(new Set()); }}
+                    onAssign={assignProjectToSelected}
+                />
             )}
 
             {/* Add Time Slot Modal */}
@@ -906,6 +900,7 @@ function CalendarContent() {
                     minute={addSlotData.minute}
                     weekDates={weekDates}
                     projects={projects}
+                    employees={employees}
                     formatTimeSlot={formatTimeSlot}
                     shortDays={shortDays}
                     slotDuration={workingHours.slotDuration}
@@ -917,6 +912,147 @@ function CalendarContent() {
     );
 }
 
+// Assign Project Modal Component
+function AssignModal({
+    selectedCount,
+    selectedEvents,
+    projects,
+    employees,
+    onClose,
+    onAssign
+}: {
+    selectedCount: number;
+    selectedEvents: CalendarEvent[];
+    projects: Project[];
+    employees: Employee[];
+    onClose: () => void;
+    onAssign: (projectId: string, employeeId: string, startTime: string, endTime: string) => void;
+}) {
+    const [selectedProject, setSelectedProject] = useState('');
+    const [selectedEmployee, setSelectedEmployee] = useState('');
+
+    // Get the first selected event's time for default values
+    const firstEvent = selectedEvents[0];
+    const defaultStartTime = firstEvent ? new Date(firstEvent.startTime) : new Date();
+    const defaultEndTime = firstEvent ? new Date(firstEvent.endTime) : new Date();
+
+    // Format time for input (HH:MM)
+    const formatTimeForInput = (date: Date) => {
+        return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    };
+
+    const [startTime, setStartTime] = useState(formatTimeForInput(defaultStartTime));
+    const [endTime, setEndTime] = useState(formatTimeForInput(defaultEndTime));
+
+    const handleSubmit = () => {
+        if (!selectedProject || !selectedEmployee) {
+            alert('Please select a project and an employee');
+            return;
+        }
+
+        // Construct full ISO datetime strings using the original date and new times
+        const [startHour, startMinute] = startTime.split(':').map(Number);
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+
+        const newStartTime = new Date(defaultStartTime);
+        newStartTime.setHours(startHour, startMinute, 0, 0);
+
+        const newEndTime = new Date(defaultStartTime);
+        newEndTime.setHours(endHour, endMinute, 0, 0);
+
+        onAssign(selectedProject, selectedEmployee, newStartTime.toISOString(), newEndTime.toISOString());
+    };
+
+    return (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+        }}>
+            <div style={{
+                background: 'white',
+                borderRadius: '8px',
+                padding: '1.5rem',
+                maxWidth: '400px',
+                width: '90%',
+            }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ margin: 0 }}>Assign to Project</h3>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+                        <X size={20} />
+                    </button>
+                </div>
+                <p style={{ color: '#64748b', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                    Assign {selectedCount} meeting{selectedCount > 1 ? 's' : ''} to:
+                </p>
+
+                <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Project *</label>
+                    <select
+                        value={selectedProject}
+                        onChange={e => setSelectedProject(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '0.5rem' }}
+                    >
+                        <option value="">Select Project</option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Employee *</label>
+                    <select
+                        value={selectedEmployee}
+                        onChange={e => setSelectedEmployee(e.target.value)}
+                        required
+                        style={{ width: '100%', padding: '0.5rem' }}
+                    >
+                        <option value="">Select Employee</option>
+                        {employees.map(e => (
+                            <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Time</label>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <input
+                            type="time"
+                            value={startTime}
+                            onChange={e => setStartTime(e.target.value)}
+                            style={{ flex: 1, padding: '0.5rem' }}
+                        />
+                        <span style={{ color: '#64748b' }}>to</span>
+                        <input
+                            type="time"
+                            value={endTime}
+                            onChange={e => setEndTime(e.target.value)}
+                            style={{ flex: 1, padding: '0.5rem' }}
+                        />
+                    </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button onClick={onClose} className="btn">Cancel</button>
+                    <button onClick={handleSubmit} className="btn btn-primary">
+                        Assign
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // Add Time Slot Modal Component
 function AddSlotModal({
     dayIndex,
@@ -924,6 +1060,7 @@ function AddSlotModal({
     minute,
     weekDates,
     projects,
+    employees,
     formatTimeSlot,
     shortDays,
     slotDuration,
@@ -935,22 +1072,24 @@ function AddSlotModal({
     minute: number;
     weekDates: Date[];
     projects: Project[];
+    employees: Employee[];
     formatTimeSlot: (h: number, m: number) => string;
     shortDays: string[];
     slotDuration: number;
     onClose: () => void;
-    onAdd: (projectId: string, description: string) => void;
+    onAdd: (projectId: string, employeeId: string, description: string) => void;
 }) {
     const [selectedProject, setSelectedProject] = useState('');
+    const [selectedEmployee, setSelectedEmployee] = useState('');
     const [description, setDescription] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedProject) {
-            alert('Please select a project');
+        if (!selectedProject || !selectedEmployee) {
+            alert('Please select a project and an employee');
             return;
         }
-        onAdd(selectedProject, description);
+        onAdd(selectedProject, selectedEmployee, description);
     };
 
     // Format duration for display
@@ -1003,6 +1142,20 @@ function AddSlotModal({
                             <option value="">Select Project</option>
                             {projects.map(p => (
                                 <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div style={{ marginBottom: '1rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Employee *</label>
+                        <select
+                            value={selectedEmployee}
+                            onChange={e => setSelectedEmployee(e.target.value)}
+                            required
+                            style={{ width: '100%', padding: '0.5rem' }}
+                        >
+                            <option value="">Select Employee</option>
+                            {employees.map(e => (
+                                <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>
                             ))}
                         </select>
                     </div>

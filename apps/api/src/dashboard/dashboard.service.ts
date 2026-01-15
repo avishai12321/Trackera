@@ -1,6 +1,6 @@
 
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseService } from '../shared/supabase.service';
 import {
     CompanyOverviewData,
     ProjectViewData,
@@ -10,24 +10,23 @@ import {
 
 @Injectable()
 export class DashboardService {
-    constructor(private prisma: PrismaService) { }
+    constructor(private supabase: SupabaseService) { }
 
     /**
      * Get company schema name from tenant ID
-     * For now, we'll use a simple mapping - you may want to query the public.companies table
      */
     private async getSchemaName(tenantId: string): Promise<string> {
-        // Query the public.companies table to get schema_name from tenant ID
-        const result = await this.prisma.db.$queryRawUnsafe<{ schema_name: string }[]>(
-            'SELECT schema_name FROM public.companies WHERE id = $1',
-            tenantId
-        );
+        const { data, error } = await this.supabase.getAdminClient()
+            .from('companies')
+            .select('schema_name')
+            .eq('id', tenantId)
+            .single();
 
-        if (!result || result.length === 0) {
+        if (error || !data) {
             throw new Error(`Company not found for tenant ID: ${tenantId}`);
         }
 
-        return result[0].schema_name;
+        return data.schema_name;
     }
 
     /**
@@ -40,14 +39,15 @@ export class DashboardService {
     ): Promise<CompanyOverviewData> {
         const schemaName = await this.getSchemaName(tenantId);
 
-        const result = await this.prisma.db.$queryRawUnsafe<{ get_company_overview: CompanyOverviewData }[]>(
-            'SELECT public.get_company_overview($1, $2::date, $3::date) as get_company_overview',
-            schemaName,
-            startDate,
-            endDate
-        );
+        const { data, error } = await this.supabase.getAdminClient()
+            .rpc('get_company_overview', {
+                p_schema_name: schemaName,
+                p_start_date: startDate,
+                p_end_date: endDate
+            });
 
-        return result[0].get_company_overview;
+        if (error) throw new Error(`Failed to get company overview: ${error.message}`);
+        return data;
     }
 
     /**
@@ -61,15 +61,16 @@ export class DashboardService {
     ): Promise<ProjectViewData> {
         const schemaName = await this.getSchemaName(tenantId);
 
-        const result = await this.prisma.db.$queryRawUnsafe<{ get_project_view: ProjectViewData }[]>(
-            'SELECT public.get_project_view($1, $2::uuid, $3::date, $4::date) as get_project_view',
-            schemaName,
-            projectId,
-            startDate,
-            endDate
-        );
+        const { data, error } = await this.supabase.getAdminClient()
+            .rpc('get_project_view', {
+                p_schema_name: schemaName,
+                p_project_id: projectId,
+                p_start_date: startDate,
+                p_end_date: endDate
+            });
 
-        return result[0].get_project_view;
+        if (error) throw new Error(`Failed to get project view: ${error.message}`);
+        return data;
     }
 
     /**
@@ -82,14 +83,15 @@ export class DashboardService {
     ): Promise<EmployeeOverviewData> {
         const schemaName = await this.getSchemaName(tenantId);
 
-        const result = await this.prisma.db.$queryRawUnsafe<{ get_employee_overview: EmployeeOverviewData }[]>(
-            'SELECT public.get_employee_overview($1, $2::date, $3::date) as get_employee_overview',
-            schemaName,
-            startDate,
-            endDate
-        );
+        const { data, error } = await this.supabase.getAdminClient()
+            .rpc('get_employee_overview', {
+                p_schema_name: schemaName,
+                p_start_date: startDate,
+                p_end_date: endDate
+            });
 
-        return result[0].get_employee_overview;
+        if (error) throw new Error(`Failed to get employee overview: ${error.message}`);
+        return data;
     }
 
     /**
@@ -103,15 +105,16 @@ export class DashboardService {
     ): Promise<EmployeeDeepDiveData> {
         const schemaName = await this.getSchemaName(tenantId);
 
-        const result = await this.prisma.db.$queryRawUnsafe<{ get_employee_deep_dive: EmployeeDeepDiveData }[]>(
-            'SELECT public.get_employee_deep_dive($1, $2::uuid, $3::date, $4::date) as get_employee_deep_dive',
-            schemaName,
-            employeeId,
-            startDate,
-            endDate
-        );
+        const { data, error } = await this.supabase.getAdminClient()
+            .rpc('get_employee_deep_dive', {
+                p_schema_name: schemaName,
+                p_employee_id: employeeId,
+                p_start_date: startDate,
+                p_end_date: endDate
+            });
 
-        return result[0].get_employee_deep_dive;
+        if (error) throw new Error(`Failed to get employee deep dive: ${error.message}`);
+        return data;
     }
 
     /**
@@ -119,9 +122,16 @@ export class DashboardService {
      */
     async getStats(tenantId: string, userId: string) {
         // 1. Resolve Employee ID
-        const employee = await this.prisma.db.employee.findFirst({
-            where: { tenantId, userId }
-        });
+        const { data: employee, error: empError } = await this.supabase.getAdminClient()
+            .from('employees')
+            .select('id')
+            .eq('tenant_id', tenantId)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (empError) {
+            console.error('Error fetching employee:', empError);
+        }
 
         if (!employee) {
             return {
@@ -142,114 +152,152 @@ export class DashboardService {
         todayEnd.setHours(23, 59, 59, 999);
 
         // Week range (Mon-Sun)
-        const day = now.getDay() || 7; // Get current day number, converting Sun (0) to 7
-        if (day !== 1) now.setHours(-24 * (day - 1)); // Go back to Monday
-        const weekStart = new Date(now);
+        const day = now.getDay() || 7;
+        const weekStartDate = new Date(now);
+        if (day !== 1) weekStartDate.setHours(-24 * (day - 1));
+        const weekStart = new Date(weekStartDate);
         weekStart.setHours(0, 0, 0, 0);
 
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
 
-        // Parallel Queries
-        const [todayAgg, weekAgg, billableAgg, recentEntries, activeProjects, projectDistAgg, employeeDistAgg, last7DaysRaw] = await Promise.all([
-            // Today's total
-            this.prisma.db.timeEntry.aggregate({
-                where: {
-                    tenantId,
-                    employeeId,
-                    date: { gte: todayStart, lte: todayEnd }
-                },
-                _sum: { minutes: true }
-            }),
-            // Week's total
-            this.prisma.db.timeEntry.aggregate({
-                where: {
-                    tenantId,
-                    employeeId,
-                    date: { gte: weekStart, lte: weekEnd }
-                },
-                _sum: { minutes: true }
-            }),
-            // Billable Split (This Week)
-            this.prisma.db.timeEntry.groupBy({
-                by: ['billable'],
-                where: {
-                    tenantId,
-                    employeeId,
-                    date: { gte: weekStart, lte: weekEnd }
-                },
-                _sum: { minutes: true }
-            }),
+        const client = this.supabase.getAdminClient();
+
+        // Parallel Queries using Supabase
+        const [
+            todayEntries,
+            weekEntries,
+            recentEntriesResult,
+            activeProjects,
+            projectDistResult,
+            employeeDistResult,
+            last7DaysResult
+        ] = await Promise.all([
+            // Today's entries
+            client
+                .from('time_entries')
+                .select('minutes')
+                .eq('tenant_id', tenantId)
+                .eq('employee_id', employeeId)
+                .gte('date', todayStart.toISOString().split('T')[0])
+                .lte('date', todayEnd.toISOString().split('T')[0]),
+
+            // Week's entries
+            client
+                .from('time_entries')
+                .select('minutes, billable')
+                .eq('tenant_id', tenantId)
+                .eq('employee_id', employeeId)
+                .gte('date', weekStart.toISOString().split('T')[0])
+                .lte('date', weekEnd.toISOString().split('T')[0]),
+
             // Recent Entries
-            this.prisma.db.timeEntry.findMany({
-                where: {
-                    tenantId,
-                    employeeId
-                },
-                orderBy: { date: 'desc' }, // Or startTime if combined
-                take: 5,
-                include: { project: true }
-            }),
+            client
+                .from('time_entries')
+                .select('id, description, minutes, date, project:projects(name)')
+                .eq('tenant_id', tenantId)
+                .eq('employee_id', employeeId)
+                .order('date', { ascending: false })
+                .limit(5),
+
             // Active Projects Count
-            this.prisma.db.project.count({
-                where: {
-                    tenantId,
-                    status: 'ACTIVE'
-                }
-            }),
+            client
+                .from('projects')
+                .select('id', { count: 'exact', head: true })
+                .eq('tenant_id', tenantId)
+                .eq('status', 'ACTIVE'),
+
             // Project Distribution
-            this.prisma.db.timeEntry.groupBy({
-                by: ['projectId'],
-                where: { tenantId },
-                _sum: { minutes: true }
-            }),
-            // Employee Distribution 
-            this.prisma.db.timeEntry.groupBy({
-                by: ['employeeId'],
-                where: { tenantId },
-                _sum: { minutes: true }
-            }),
-            // Last 7 Days Activity (Raw)
-            this.prisma.db.timeEntry.findMany({
-                where: {
-                    tenantId,
-                    date: { gte: new Date(new Date().setDate(new Date().getDate() - 7)) }
-                },
-                select: { date: true, minutes: true }
-            })
+            client
+                .from('time_entries')
+                .select('project_id, minutes')
+                .eq('tenant_id', tenantId),
+
+            // Employee Distribution
+            client
+                .from('time_entries')
+                .select('employee_id, minutes')
+                .eq('tenant_id', tenantId),
+
+            // Last 7 Days Activity
+            client
+                .from('time_entries')
+                .select('date, minutes')
+                .eq('tenant_id', tenantId)
+                .gte('date', new Date(new Date().setDate(new Date().getDate() - 7)).toISOString().split('T')[0])
         ]);
 
-        // Post-process names
-        const projectIds = projectDistAgg.map((p: any) => p.projectId).filter(Boolean) as string[];
-        const employeeIds = employeeDistAgg.map((e: any) => e.employeeId).filter(Boolean) as string[];
+        // Calculate today's total
+        const todayMinutes = (todayEntries.data || []).reduce((sum: number, e: any) => sum + (e.minutes || 0), 0);
 
-        const [projectsMap, employeesMap] = await Promise.all([
-            this.prisma.db.project.findMany({
-                where: { id: { in: projectIds } },
-                select: { id: true, name: true }
-            }),
-            this.prisma.db.employee.findMany({
-                where: { id: { in: employeeIds } },
-                select: { id: true, firstName: true, lastName: true }
-            })
-        ]);
+        // Calculate week's total and billable split
+        const weekData = weekEntries.data || [];
+        const weekMinutes = weekData.reduce((sum: number, e: any) => sum + (e.minutes || 0), 0);
 
-        const projectLookup = new Map(projectsMap.map((p: any) => [p.id, p.name]));
-        const employeeLookup = new Map(employeesMap.map((e: any) => [e.id, `${e.firstName} ${e.lastName}`]));
-
-        const projectDistribution = projectDistAgg.map((p: any) => ({
-            name: projectLookup.get(p.projectId!) || 'Unknown',
-            value: p._sum.minutes || 0
+        // Billable Split
+        const billableMap = new Map<boolean, number>();
+        weekData.forEach((e: any) => {
+            const key = e.billable || false;
+            billableMap.set(key, (billableMap.get(key) || 0) + (e.minutes || 0));
+        });
+        const billableSplit = Array.from(billableMap.entries()).map(([billable, minutes]) => ({
+            billable,
+            minutes
         }));
 
-        const employeeDistribution = employeeDistAgg.map((e: any) => ({
-            name: employeeLookup.get(e.employeeId!) || 'Unknown',
-            value: e._sum.minutes || 0
+        // Recent Entries
+        const recentEntries = (recentEntriesResult.data || []).map((e: any) => ({
+            id: e.id,
+            description: e.description,
+            project: e.project?.name || 'Unknown',
+            minutes: e.minutes,
+            date: e.date
+        }));
+
+        // Project Distribution - aggregate by project
+        const projectDistMap = new Map<string, number>();
+        (projectDistResult.data || []).forEach((e: any) => {
+            if (e.project_id) {
+                projectDistMap.set(e.project_id, (projectDistMap.get(e.project_id) || 0) + (e.minutes || 0));
+            }
+        });
+
+        // Employee Distribution - aggregate by employee
+        const employeeDistMap = new Map<string, number>();
+        (employeeDistResult.data || []).forEach((e: any) => {
+            if (e.employee_id) {
+                employeeDistMap.set(e.employee_id, (employeeDistMap.get(e.employee_id) || 0) + (e.minutes || 0));
+            }
+        });
+
+        // Fetch project and employee names
+        const projectIds = Array.from(projectDistMap.keys());
+        const employeeIds = Array.from(employeeDistMap.keys());
+
+        const [projectsResult, employeesResult] = await Promise.all([
+            projectIds.length > 0
+                ? client.from('projects').select('id, name').in('id', projectIds)
+                : { data: [] },
+            employeeIds.length > 0
+                ? client.from('employees').select('id, first_name, last_name').in('id', employeeIds)
+                : { data: [] }
+        ]);
+
+        const projectLookup = new Map((projectsResult.data || []).map((p: any) => [p.id, p.name]));
+        const employeeLookup = new Map((employeesResult.data || []).map((e: any) => [e.id, `${e.first_name} ${e.last_name}`]));
+
+        const projectDistribution = Array.from(projectDistMap.entries()).map(([id, value]) => ({
+            name: projectLookup.get(id) || 'Unknown',
+            value
+        }));
+
+        const employeeDistribution = Array.from(employeeDistMap.entries()).map(([id, value]) => ({
+            name: employeeLookup.get(id) || 'Unknown',
+            value
         }));
 
         // Process Daily Activity
-        // Bucket by YYYY-MM-DD
         const dailyMap = new Map<string, number>();
         const sevenDaysKeys: string[] = [];
         for (let i = 6; i >= 0; i--) {
@@ -260,10 +308,10 @@ export class DashboardService {
             dailyMap.set(k, 0);
         }
 
-        last7DaysRaw.forEach((e: any) => {
-            const k = new Date(e.date).toISOString().split('T')[0];
+        (last7DaysResult.data || []).forEach((e: any) => {
+            const k = e.date;
             if (dailyMap.has(k)) {
-                dailyMap.set(k, dailyMap.get(k)! + e.minutes);
+                dailyMap.set(k, dailyMap.get(k)! + (e.minutes || 0));
             }
         });
 
@@ -273,17 +321,11 @@ export class DashboardService {
         }));
 
         return {
-            todayMinutes: todayAgg._sum.minutes || 0,
-            weekMinutes: weekAgg._sum.minutes || 0,
-            billableSplit: billableAgg.map((b: any) => ({ billable: b.billable, minutes: b._sum.minutes || 0 })),
-            recentEntries: recentEntries.map((e: any) => ({
-                id: e.id,
-                description: e.description,
-                project: e.project.name,
-                minutes: e.minutes,
-                date: e.date
-            })),
-            activeProjectsCount: activeProjects,
+            todayMinutes,
+            weekMinutes,
+            billableSplit,
+            recentEntries,
+            activeProjectsCount: activeProjects.count || 0,
             projectDistribution,
             employeeDistribution,
             dailyActivity

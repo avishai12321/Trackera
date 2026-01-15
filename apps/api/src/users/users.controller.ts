@@ -5,7 +5,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { TenantGuard } from '../common/guards/tenant.guard';
-import { Role } from '@prisma/client';
+import { Role } from '../shared/enums';
 import { TenantContext } from '../shared/tenant-context';
 
 @Controller('users')
@@ -22,7 +22,7 @@ export class UsersController {
     }
 
     @Get()
-    @Roles(Role.OWNER, Role.ADMIN, Role.MANAGER) // Managers can list users? Or everyone?
+    @Roles(Role.OWNER, Role.ADMIN, Role.MANAGER, Role.EMPLOYEE) // Everyone can list users (collaborative)
     // Let's say everyone can list users for now (to select in projects)
     // But strictly, maybe only Managers+?
     // Spec: "Users & Employees: CRUD APIs". 

@@ -10,7 +10,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   imports: [
     UsersModule,
     PassportModule,
-    JwtModule.register({}), // We register async in service or just use signAsync
+    JwtModule.register({}),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

@@ -14,7 +14,7 @@ export class TenantMiddleware implements NestMiddleware {
 
         // STRATEGY: 
         // 1. If 'x-tenant-id' header exists, use it.
-        // 2. If not, we might fail or proceed without context (and PrismaService will skip RLS setting).
+        // 2. If not, proceed without context (Supabase service handles tenant filtering).
 
         if (tenantId) {
             TenantContext.run(tenantId as string, () => {

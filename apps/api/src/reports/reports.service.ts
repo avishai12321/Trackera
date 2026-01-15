@@ -1,15 +1,14 @@
 
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { Parser } from 'json2csv';
 import { TimeEntriesService } from '../time-entries/time-entries.service';
 
 @Injectable()
 export class ReportsService {
     constructor(
-        private prisma: PrismaService,
         private timeEntriesService: TimeEntriesService
     ) { }
+
 
     async generateCsv(tenantId: string, filter: any) {
         // Reuse findAll from TimeEntriesService or query directly

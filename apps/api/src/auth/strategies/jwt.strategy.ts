@@ -1,6 +1,7 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { SupabaseService } from '../../shared/supabase.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -9,7 +10,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private jwksCacheTime: number = 0;
     private readonly CACHE_TTL = 600000; // 10 minutes
 
-    constructor() {
+    constructor(private supabase: SupabaseService) {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -87,14 +88,30 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     async validate(payload: any) {
         this.logger.log(`Token validated for user: ${payload.email} (${payload.sub})`);
 
-        // Supabase JWT payload structure
-        return {
+        // Get roles from Supabase (assuming 'user_roles' table exists)
+        const { data: userRoles, error } = await this.supabase.getAdminClient()
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', payload.sub);
+
+        if (error) {
+            this.logger.error(`Error fetching roles: ${error.message}`);
+        }
+
+        // Basic Supabase payload mapping
+        const user = {
             id: payload.sub,
             email: payload.email,
             tenantId: payload.user_metadata?.company_id,
-            roles: payload.role ? [payload.role] : [],
+            roles: userRoles && userRoles.length > 0 ? userRoles : [{ role: 'authenticated' }], // Fallback but formatted for RolesGuard
             employeeId: payload.user_metadata?.employee_id,
             username: payload.email,
         };
+
+        // If no roles found in DB, maybe try to sync/create default role?
+        // For now, let's just log what we found
+        this.logger.log(`Roles found: ${JSON.stringify(user.roles)}`);
+
+        return user;
     }
 }
