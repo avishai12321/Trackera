@@ -180,10 +180,17 @@ export class TimeEntriesService {
         return filtered.map((event: any) => ({
             id: event.id,
             title: event.title,
+            description: event.description || null,
             startTime: event.start_at,
             endTime: event.end_at,
             durationMinutes: Math.round((new Date(event.end_at).getTime() - new Date(event.start_at).getTime()) / 60000),
-            provider: event.provider
+            provider: event.provider,
+            location: event.location || null,
+            organizer: event.organizer || null,
+            attendees: event.attendees || [],
+            attendeesCount: event.attendees_count || 0,
+            conferenceLink: event.conference_link || null,
+            eventStatus: event.event_status || 'confirmed'
         }));
     }
 

@@ -6,18 +6,34 @@ import { supabase, getCompanySchema } from '@/lib/supabase';
 import DashboardLayout from '../../components/DashboardLayout';
 import {
     Plus, Calendar as CalendarIcon, Loader, ChevronLeft, ChevronRight,
-    Settings, X, Check, Clock, RefreshCw, Eye, EyeOff
+    Settings, X, Check, Clock, RefreshCw, Eye, EyeOff, Users, MapPin, Video, ExternalLink
 } from 'lucide-react';
+
+interface Attendee {
+    email: string;
+    displayName: string | null;
+    responseStatus: 'needsAction' | 'declined' | 'tentative' | 'accepted';
+    organizer: boolean;
+    self: boolean;
+    optional: boolean;
+}
 
 interface CalendarEvent {
     id: string;
     title: string;
+    description?: string | null;
     startTime: string;
     endTime: string;
     durationMinutes: number;
     source: 'google' | 'manual';
     projectId?: string;
     confirmed?: boolean;
+    location?: string | null;
+    organizer?: string | null;
+    attendees?: Attendee[];
+    attendeesCount?: number;
+    conferenceLink?: string | null;
+    eventStatus?: string;
 }
 
 interface Project {
@@ -84,6 +100,8 @@ function CalendarContent() {
     const [showProjectModal, setShowProjectModal] = useState(false);
     const [showAddSlotModal, setShowAddSlotModal] = useState(false);
     const [addSlotData, setAddSlotData] = useState<{ dayIndex: number; hour: number; minute: number; endHour?: number; endMinute?: number } | null>(null);
+    const [showEventDetails, setShowEventDetails] = useState(false);
+    const [selectedEventDetails, setSelectedEventDetails] = useState<CalendarEvent | null>(null);
 
     // Drag selection state
     const [isDragging, setIsDragging] = useState(false);
@@ -193,12 +211,19 @@ function CalendarContent() {
             setCalendarEvents(sRes.data.map((s: any) => ({
                 id: s.id,
                 title: s.title,
+                description: s.description || null,
                 startTime: s.startTime,
                 endTime: s.endTime,
                 durationMinutes: s.durationMinutes,
                 source: 'google',
                 projectId: s.projectId,
-                confirmed: s.confirmed || false
+                confirmed: s.confirmed || false,
+                location: s.location || null,
+                organizer: s.organizer || null,
+                attendees: s.attendees || [],
+                attendeesCount: s.attendeesCount || 0,
+                conferenceLink: s.conferenceLink || null,
+                eventStatus: s.eventStatus || 'confirmed'
             })));
         } catch (err) {
             console.error(err);
@@ -288,6 +313,7 @@ function CalendarContent() {
 
     // Handle slot click (for selection)
     const handleSlotClick = (slotId: string, event: React.MouseEvent) => {
+        const calEvent = calendarEvents.find(e => e.id === slotId);
         if (event.ctrlKey || event.metaKey) {
             // Multi-select with Ctrl/Cmd
             setSelectedSlots(prev => {
@@ -299,10 +325,17 @@ function CalendarContent() {
                 }
                 return newSet;
             });
-        } else {
-            // Single select
+        } else if (event.shiftKey) {
+            // Shift+click to assign directly
             setSelectedSlots(new Set([slotId]));
             setShowProjectModal(true);
+        } else {
+            // Single click - show event details
+            setSelectedSlots(new Set([slotId]));
+            if (calEvent) {
+                setSelectedEventDetails(calEvent);
+                setShowEventDetails(true);
+            }
         }
     };
 
@@ -812,6 +845,24 @@ function CalendarContent() {
                                                             }}>
                                                                 {event.title}
                                                             </span>
+                                                            {/* Attendee & Conference indicators */}
+                                                            {(event.attendeesCount && event.attendeesCount > 1) && (
+                                                                <span style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: '2px',
+                                                                    fontSize: '0.6rem',
+                                                                    opacity: 0.7
+                                                                }} title={`${event.attendeesCount} attendees`}>
+                                                                    <Users size={10} />
+                                                                    {event.attendeesCount}
+                                                                </span>
+                                                            )}
+                                                            {event.conferenceLink && (
+                                                                <span title="Has video call">
+                                                                    <Video size={10} style={{ opacity: 0.7 }} />
+                                                                </span>
+                                                            )}
                                                             {event.projectId && !event.confirmed && (
                                                                 <button
                                                                     onClick={(e) => {
@@ -876,7 +927,7 @@ function CalendarContent() {
                     Confirmed
                 </span>
                 <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>
-                    Tip: Ctrl+Click to select multiple meetings
+                    Click to view details • Shift+Click to assign • Ctrl+Click to multi-select
                 </span>
             </div>
 
@@ -906,6 +957,49 @@ function CalendarContent() {
                     slotDuration={workingHours.slotDuration}
                     onClose={() => { setShowAddSlotModal(false); setAddSlotData(null); }}
                     onAdd={addManualSlot}
+                />
+            )}
+
+            {/* Event Details Modal */}
+            {showEventDetails && selectedEventDetails && (
+                <EventDetailsModal
+                    event={selectedEventDetails}
+                    projects={projects}
+                    employees={employees}
+                    onClose={() => { setShowEventDetails(false); setSelectedEventDetails(null); setSelectedSlots(new Set()); }}
+                    onAssign={async (projectId, employeeId, startTime, endTime) => {
+                        // Create time entry directly
+                        const { data: { session } } = await supabase.auth.getSession();
+                        if (!session) return;
+                        const token = session.access_token;
+                        const tenantId = session.user.user_metadata?.company_id;
+
+                        try {
+                            const start = new Date(startTime);
+                            const end = new Date(endTime);
+                            const durationMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+
+                            await axios.post('http://localhost:3000/time-entries', {
+                                projectId,
+                                employeeId,
+                                description: selectedEventDetails.title,
+                                startTime,
+                                endTime,
+                                durationMinutes,
+                                billable: true,
+                                confirmed: false
+                            }, {
+                                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
+                            });
+
+                            setShowEventDetails(false);
+                            setSelectedEventDetails(null);
+                            setSelectedSlots(new Set());
+                            fetchData();
+                        } catch (err) {
+                            alert('Failed to assign project');
+                        }
+                    }}
                 />
             )}
         </DashboardLayout>
@@ -1175,6 +1269,332 @@ function AddSlotModal({
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    );
+}
+
+// Event Details Modal Component with Assignment Form
+function EventDetailsModal({
+    event,
+    projects,
+    employees,
+    onClose,
+    onAssign
+}: {
+    event: CalendarEvent;
+    projects: Project[];
+    employees: Employee[];
+    onClose: () => void;
+    onAssign: (projectId: string, employeeId: string, startTime: string, endTime: string) => void;
+}) {
+    const [selectedProject, setSelectedProject] = useState('');
+    const [selectedEmployee, setSelectedEmployee] = useState('');
+    const [showAttendeesList, setShowAttendeesList] = useState(false);
+
+    // Get event times for default values
+    const defaultStartTime = new Date(event.startTime);
+    const defaultEndTime = new Date(event.endTime);
+
+    // Format time for input (HH:MM)
+    const formatTimeForInput = (date: Date) => {
+        return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    };
+
+    const [startTime, setStartTime] = useState(formatTimeForInput(defaultStartTime));
+    const [endTime, setEndTime] = useState(formatTimeForInput(defaultEndTime));
+
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    };
+
+    const getInitials = (email: string, displayName: string | null) => {
+        if (displayName) {
+            const parts = displayName.split(' ');
+            return parts.map(p => p[0]).slice(0, 2).join('').toUpperCase();
+        }
+        return email.substring(0, 2).toUpperCase();
+    };
+
+    const getResponseColor = (status: string) => {
+        switch (status) {
+            case 'accepted': return '#10b981';
+            case 'tentative': return '#f59e0b';
+            case 'declined': return '#ef4444';
+            default: return '#94a3b8';
+        }
+    };
+
+    const handleSubmit = () => {
+        if (!selectedProject || !selectedEmployee) {
+            alert('Please select a project and an employee');
+            return;
+        }
+
+        // Construct full ISO datetime strings using the original date and new times
+        const [startHour, startMinute] = startTime.split(':').map(Number);
+        const [endHour, endMinute] = endTime.split(':').map(Number);
+
+        const newStartTime = new Date(defaultStartTime);
+        newStartTime.setHours(startHour, startMinute, 0, 0);
+
+        const newEndTime = new Date(defaultStartTime);
+        newEndTime.setHours(endHour, endMinute, 0, 0);
+
+        onAssign(selectedProject, selectedEmployee, newStartTime.toISOString(), newEndTime.toISOString());
+    };
+
+    return (
+        <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+        }}>
+            <div style={{
+                background: 'white',
+                borderRadius: '12px',
+                padding: '1.5rem',
+                maxWidth: '500px',
+                width: '90%',
+                maxHeight: '80vh',
+                overflow: 'auto',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                    <div style={{ flex: 1 }}>
+                        <h2 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem', fontWeight: 600, color: '#1e293b' }}>
+                            {event.title}
+                        </h2>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontSize: '0.875rem' }}>
+                            <Clock size={14} />
+                            <span>{formatDate(event.startTime)}</span>
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.25rem' }}>
+                        <X size={20} color="#64748b" />
+                    </button>
+                </div>
+
+                {/* Location */}
+                {event.location && (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '1rem', color: '#475569' }}>
+                        <MapPin size={16} style={{ marginTop: '2px', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.875rem' }}>{event.location}</span>
+                    </div>
+                )}
+
+                {/* Description */}
+                {event.description && (
+                    <div style={{
+                        marginBottom: '1rem',
+                        padding: '0.75rem',
+                        background: '#f8fafc',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        color: '#475569',
+                        lineHeight: 1.5,
+                        whiteSpace: 'pre-wrap'
+                    }}>
+                        {event.description.length > 200 ? event.description.substring(0, 200) + '...' : event.description}
+                    </div>
+                )}
+
+                {/* Attendees (expandable) */}
+                {event.attendees && event.attendees.length > 0 && (
+                    <div
+                        style={{
+                            marginBottom: '1rem',
+                            padding: '0.5rem',
+                            background: '#f8fafc',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                        }}
+                        onClick={() => setShowAttendeesList(!showAttendeesList)}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#374151', fontSize: '0.8rem' }}>
+                            <Users size={14} />
+                            <span>{event.attendees.length} attendee{event.attendees.length > 1 ? 's' : ''}</span>
+                            <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                                {showAttendeesList ? '(click to collapse)' : '(click to expand)'}
+                            </span>
+                            <div style={{ display: 'flex', marginLeft: 'auto' }}>
+                                {!showAttendeesList && event.attendees.slice(0, 5).map((attendee, idx) => (
+                                    <div key={idx} style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '50%',
+                                        background: attendee.organizer ? '#8b5cf6' : '#e2e8f0',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.6rem',
+                                        fontWeight: 600,
+                                        color: attendee.organizer ? 'white' : '#475569',
+                                        marginLeft: idx > 0 ? '-8px' : 0,
+                                        border: '2px solid white'
+                                    }} title={attendee.displayName || attendee.email}>
+                                        {getInitials(attendee.email, attendee.displayName)}
+                                    </div>
+                                ))}
+                                {!showAttendeesList && event.attendees.length > 5 && (
+                                    <div style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '50%',
+                                        background: '#94a3b8',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '0.55rem',
+                                        fontWeight: 600,
+                                        color: 'white',
+                                        marginLeft: '-8px',
+                                        border: '2px solid white'
+                                    }}>
+                                        +{event.attendees.length - 5}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        {/* Expanded attendee list */}
+                        {showAttendeesList && (
+                            <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {event.attendees.map((attendee, idx) => (
+                                    <div key={idx} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        padding: '0.25rem 0.5rem',
+                                        background: 'white',
+                                        borderRadius: '4px'
+                                    }}>
+                                        <div style={{
+                                            width: '24px',
+                                            height: '24px',
+                                            borderRadius: '50%',
+                                            background: attendee.organizer ? '#8b5cf6' : '#e2e8f0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '0.55rem',
+                                            fontWeight: 600,
+                                            color: attendee.organizer ? 'white' : '#475569',
+                                            flexShrink: 0
+                                        }}>
+                                            {getInitials(attendee.email, attendee.displayName)}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                                            <div style={{
+                                                fontSize: '0.8rem',
+                                                fontWeight: attendee.organizer ? 500 : 400,
+                                                color: '#1e293b',
+                                                whiteSpace: 'nowrap',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis'
+                                            }}>
+                                                {attendee.displayName || attendee.email}
+                                                {attendee.organizer && (
+                                                    <span style={{
+                                                        marginLeft: '0.5rem',
+                                                        fontSize: '0.6rem',
+                                                        padding: '0.1rem 0.3rem',
+                                                        background: '#8b5cf6',
+                                                        color: 'white',
+                                                        borderRadius: '3px'
+                                                    }}>Organizer</span>
+                                                )}
+                                            </div>
+                                            {attendee.displayName && (
+                                                <div style={{ fontSize: '0.7rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {attendee.email}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div style={{
+                                            width: '8px',
+                                            height: '8px',
+                                            borderRadius: '50%',
+                                            background: getResponseColor(attendee.responseStatus),
+                                            flexShrink: 0
+                                        }} title={attendee.responseStatus} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Divider */}
+                <div style={{ borderTop: '1px solid #e2e8f0', margin: '1rem 0' }} />
+
+                {/* Assignment Form */}
+                <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Project *</label>
+                    <select
+                        value={selectedProject}
+                        onChange={e => setSelectedProject(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}
+                    >
+                        <option value="">Select Project</option>
+                        {projects.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Employee *</label>
+                    <select
+                        value={selectedEmployee}
+                        onChange={e => setSelectedEmployee(e.target.value)}
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}
+                    >
+                        <option value="">Select Employee</option>
+                        {employees.map(e => (
+                            <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Start Time</label>
+                        <input
+                            type="time"
+                            value={startTime}
+                            onChange={e => setStartTime(e.target.value)}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}
+                        />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>End Time</label>
+                        <input
+                            type="time"
+                            value={endTime}
+                            onChange={e => setEndTime(e.target.value)}
+                            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}
+                        />
+                    </div>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                    <button onClick={onClose} className="btn" style={{ flex: 1 }}>
+                        Cancel
+                    </button>
+                    <button onClick={handleSubmit} className="btn btn-primary" style={{ flex: 1 }}>
+                        Assign to Project
+                    </button>
+                </div>
             </div>
         </div>
     );

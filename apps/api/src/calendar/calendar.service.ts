@@ -158,6 +158,29 @@ export class CalendarService {
 
                         if (!startAt || !endAt) continue;
 
+                        // Extract attendees data
+                        const attendeesData = event.attendees?.map(a => ({
+                            email: a.email,
+                            displayName: a.displayName || null,
+                            responseStatus: a.responseStatus || 'needsAction',
+                            organizer: a.organizer || false,
+                            self: a.self || false,
+                            optional: a.optional || false
+                        })) || null;
+
+                        // Extract conference/meeting link
+                        let conferenceLink: string | null = null;
+                        if (event.hangoutLink) {
+                            conferenceLink = event.hangoutLink;
+                        } else if (event.conferenceData?.entryPoints) {
+                            const videoEntry = event.conferenceData.entryPoints.find(
+                                ep => ep.entryPointType === 'video'
+                            );
+                            if (videoEntry?.uri) {
+                                conferenceLink = videoEntry.uri;
+                            }
+                        }
+
                         // Upsert Logic: Supabase upsert works if we have a unique constraint
                         // Unique constraint on: [tenant_id, connection_id, provider, provider_event_id]
                         // Make sure tenant_id IS included in the insert payload
@@ -170,10 +193,17 @@ export class CalendarService {
                                 provider_event_id: event.id!,
                                 ical_uid: event.iCalUID || null,
                                 title: event.summary,
+                                description: event.description || null,
                                 start_at: new Date(startAt).toISOString(),
                                 end_at: new Date(endAt).toISOString(),
                                 is_all_day: !event.start.dateTime,
                                 location: event.location,
+                                organizer: event.organizer?.email || null,
+                                attendees: attendeesData,
+                                attendees_count: event.attendees?.length || 0,
+                                conference_link: conferenceLink,
+                                event_status: event.status || 'confirmed',
+                                visibility: event.visibility || 'default',
                                 updated_at_provider: new Date().toISOString(),
                                 synced_at: new Date().toISOString()
                             }, { onConflict: 'tenant_id,connection_id,provider,provider_event_id' });
