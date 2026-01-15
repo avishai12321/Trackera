@@ -269,6 +269,10 @@ export default function TimeAllocation() {
         const totalHours = getProjectTotal(project.id);
         if (project.budget_type === 'FIXED') {
             return project.total_budget || 0;
+        } else if (project.budget_type === 'MONTHLY_RATE') {
+            // For monthly rate, return monthly rate * number of months with allocations
+            const monthsWithAllocations = months.filter(m => getProjectMonthTotal(project.id, m.year, m.month) > 0).length;
+            return (project.total_budget || 0) * monthsWithAllocations;
         } else {
             return totalHours * (project.hourly_rate || 0);
         }

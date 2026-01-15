@@ -63,17 +63,34 @@
     display: flex;
     align-items: center;
     gap: $spacing-3;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: $primary-600;
     margin-bottom: $spacing-8;
 
     .logoIcon {
-        width: 32px;
-        height: 32px;
-        background: $gradient-primary;
-        border-radius: $radius-md;
+        width: 28px;
+        height: 34px;
         flex-shrink: 0;
+    }
+
+    .logoText {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .logoTitle {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        letter-spacing: 0.15em;
+        line-height: 1.2;
+    }
+
+    .logoTagline {
+        font-size: 0.5rem;
+        font-weight: 500;
+        color: #64748b;
+        letter-spacing: 0.1em;
+        line-height: 1.2;
     }
 }
 

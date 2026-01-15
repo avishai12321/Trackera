@@ -211,7 +211,7 @@ export default function Projects() {
                 client_id: editData.client_id || null,
                 manager_id: editData.manager_id || null,
                 budget_type: editData.budget_type || 'FIXED',
-                total_budget: editData.budget_type === 'FIXED' ? editData.total_budget : null,
+                total_budget: (editData.budget_type === 'FIXED' || editData.budget_type === 'MONTHLY_RATE') ? editData.total_budget : null,
                 hourly_rate: editData.budget_type === 'HOURLY_RATE' ? editData.hourly_rate : null,
                 estimated_hours: editData.budget_type === 'HOURLY_RATE' ? editData.estimated_hours : null,
                 currency: editData.currency || 'USD',
@@ -346,20 +346,21 @@ export default function Projects() {
                                                     >
                                                         <option value="FIXED">Fixed</option>
                                                         <option value="HOURLY_RATE">Hourly</option>
+                                                        <option value="MONTHLY_RATE">Monthly</option>
                                                     </select>
                                                 </td>
                                                 <td>
                                                     <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                                                         <input
                                                             type="number"
-                                                            placeholder={editData.budget_type === 'FIXED' ? 'Budget' : 'Rate'}
-                                                            value={editData.budget_type === 'FIXED' ? (editData.total_budget || '') : (editData.hourly_rate || '')}
+                                                            placeholder={editData.budget_type === 'HOURLY_RATE' ? 'Rate' : (editData.budget_type === 'MONTHLY_RATE' ? 'Monthly' : 'Budget')}
+                                                            value={editData.budget_type === 'HOURLY_RATE' ? (editData.hourly_rate || '') : (editData.total_budget || '')}
                                                             onChange={e => {
                                                                 const val = e.target.value ? parseFloat(e.target.value) : null;
-                                                                if (editData.budget_type === 'FIXED') {
-                                                                    setEditData({...editData, total_budget: val});
-                                                                } else {
+                                                                if (editData.budget_type === 'HOURLY_RATE') {
                                                                     setEditData({...editData, hourly_rate: val});
+                                                                } else {
+                                                                    setEditData({...editData, total_budget: val});
                                                                 }
                                                             }}
                                                             style={{ width: '80px', padding: '0.25rem' }}
@@ -424,15 +425,17 @@ export default function Projects() {
                                                         padding: '2px 8px',
                                                         borderRadius: '4px',
                                                         fontSize: '0.75rem',
-                                                        background: project.budget_type === 'FIXED' ? '#e0e7ff' : '#fef3c7',
-                                                        color: project.budget_type === 'FIXED' ? '#3730a3' : '#92400e'
+                                                        background: project.budget_type === 'FIXED' ? '#e0e7ff' : (project.budget_type === 'MONTHLY_RATE' ? '#d1fae5' : '#fef3c7'),
+                                                        color: project.budget_type === 'FIXED' ? '#3730a3' : (project.budget_type === 'MONTHLY_RATE' ? '#065f46' : '#92400e')
                                                     }}>
-                                                        {project.budget_type === 'FIXED' ? 'Fixed' : 'Hourly'}
+                                                        {project.budget_type === 'FIXED' ? 'Fixed' : (project.budget_type === 'MONTHLY_RATE' ? 'Monthly' : 'Hourly')}
                                                     </span>
                                                 </td>
                                                 <td>
                                                     {project.budget_type === 'FIXED' ? (
                                                         project.total_budget ? `${project.currency || 'USD'} ${parseFloat(String(project.total_budget)).toLocaleString()}` : '-'
+                                                    ) : project.budget_type === 'MONTHLY_RATE' ? (
+                                                        project.total_budget ? `${project.currency || 'USD'} ${parseFloat(String(project.total_budget)).toLocaleString()}/mo` : '-'
                                                     ) : (
                                                         project.hourly_rate ? `${project.currency || 'USD'} ${parseFloat(String(project.hourly_rate)).toFixed(2)}/hr` : '-'
                                                     )}

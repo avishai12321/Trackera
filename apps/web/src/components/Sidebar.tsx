@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { LayoutDashboard, Clock, Calendar, FileText, FolderKanban, LogOut, Upload, FileCheck, Users, Building2, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from './Sidebar.module.scss';
@@ -47,8 +48,19 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
     return (
         <aside className={clsx(styles.sidebar, collapsed && styles.collapsed)}>
             <div className={styles.logo}>
-                <div className={styles.logoIcon} />
-                {!collapsed && <span>Trackera</span>}
+                <Image
+                    src="/logo-icon.svg"
+                    alt="Trackera"
+                    width={28}
+                    height={34}
+                    className={styles.logoIcon}
+                />
+                {!collapsed && (
+                    <div className={styles.logoText}>
+                        <span className={styles.logoTitle}>TRACKERA</span>
+                        <span className={styles.logoTagline}>TRACK LESS, KNOW MORE</span>
+                    </div>
+                )}
             </div>
 
             <button onClick={onToggle} className={styles.collapseBtn} title={collapsed ? 'Expand' : 'Collapse'}>
