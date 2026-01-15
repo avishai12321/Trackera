@@ -12,22 +12,85 @@
     left: 0;
     top: 0;
     z-index: 50;
+    transition: width 0.2s ease;
+
+    &.collapsed {
+        width: 70px;
+        padding: $spacing-4;
+
+        .logo {
+            justify-content: center;
+            margin-bottom: $spacing-6;
+        }
+
+        .link {
+            justify-content: center;
+            padding: $spacing-3;
+        }
+
+        .logoutBtn {
+            justify-content: center;
+            padding: $spacing-3;
+        }
+    }
+}
+
+.collapseBtn {
+    position: absolute;
+    top: 50%;
+    right: -12px;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: white;
+    border: 1px solid $slate-200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: $slate-500;
+    transition: $transition-base;
+    z-index: 51;
+
+    &:hover {
+        background: $slate-50;
+        color: $slate-700;
+    }
 }
 
 .logo {
     display: flex;
     align-items: center;
     gap: $spacing-3;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: $primary-600;
     margin-bottom: $spacing-8;
 
     .logoIcon {
-        width: 32px;
-        height: 32px;
-        background: $gradient-primary;
-        border-radius: $radius-md;
+        width: 28px;
+        height: 34px;
+        flex-shrink: 0;
+    }
+
+    .logoText {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .logoTitle {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #1e293b;
+        letter-spacing: 0.15em;
+        line-height: 1.2;
+    }
+
+    .logoTagline {
+        font-size: 0.5rem;
+        font-weight: 500;
+        color: #64748b;
+        letter-spacing: 0.1em;
+        line-height: 1.2;
     }
 }
 

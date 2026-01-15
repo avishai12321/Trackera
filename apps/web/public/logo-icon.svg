@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" fill="none">
+  <!-- Top bar -->
+  <rect x="10" y="5" width="80" height="12" rx="2" fill="#1e293b"/>
+
+  <!-- Bottom bar -->
+  <rect x="10" y="103" width="80" height="12" rx="2" fill="#1e293b"/>
+
+  <!-- Hourglass glass outline -->
+  <path d="M20 17 L20 45 Q50 70 50 60 Q50 70 80 45 L80 17" stroke="#1e293b" stroke-width="4" fill="none"/>
+  <path d="M20 103 L20 75 Q50 50 50 60 Q50 50 80 75 L80 103" stroke="#1e293b" stroke-width="4" fill="none"/>
+
+  <!-- Sand in top -->
+  <path d="M25 20 L25 40 Q50 58 50 52 Q50 58 75 40 L75 20 Z" fill="#1e293b" opacity="0.3"/>
+
+  <!-- Sand falling -->
+  <ellipse cx="50" cy="60" rx="3" ry="4" fill="#1e293b"/>
+
+  <!-- Sand in bottom -->
+  <path d="M30 100 Q50 85 70 100 Z" fill="#1e293b"/>
+
+  <!-- Small sand particles -->
+  <circle cx="45" cy="92" r="1.5" fill="#1e293b"/>
+  <circle cx="55" cy="94" r="1.5" fill="#1e293b"/>
+  <circle cx="50" cy="88" r="1" fill="#1e293b"/>
+</svg>

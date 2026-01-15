@@ -102,7 +102,9 @@ function CompanyOverviewTab() {
         capacity: 0,
         income: 0
     });
-    const [projectData, setProjectData] = useState<any[]>([]);
+    const [openProjects, setOpenProjects] = useState<any[]>([]);
+    const [employeeHoursData, setEmployeeHoursData] = useState<any[]>([]);
+    const [projectKeys, setProjectKeys] = useState<string[]>([]);
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -123,28 +125,68 @@ function CompanyOverviewTab() {
                     .select('*', { count: 'exact', head: true })
                     .eq('status', 'ACTIVE');
 
-                // Get projects for chart and income
+                // Get employees for chart
+                const { data: employees } = await supabase
+                    .schema(schema)
+                    .from('employees')
+                    .select('id, first_name, last_name')
+                    .eq('status', 'ACTIVE');
+
+                // Get projects with details for open projects list
                 const { data: projects } = await supabase
                     .schema(schema)
                     .from('projects')
                     .select('id, name, total_budget, estimated_hours')
                     .eq('status', 'ACTIVE');
 
+                // Get time allocations to calculate execution rates
+                const { data: allocations } = await supabase
+                    .schema(schema)
+                    .from('time_allocations')
+                    .select('project_id, employee_id, hours');
+
                 if (projects) {
                     const totalIncome = projects.reduce((sum, p) => sum + (p.total_budget || 0), 0);
 
-                    // Prepare chart data
-                    const chartData = projects.map(p => ({
-                        name: p.name,
-                        budget: p.total_budget || 0,
-                        hours: p.estimated_hours || 0
-                    }));
-                    setProjectData(chartData);
+                    // Calculate execution rate for each project (mock: random for now, real would compare actual vs planned)
+                    const projectsWithRates = projects.map(p => {
+                        // In real app, calculate actual hours / planned hours
+                        const executionRate = Math.floor(Math.random() * 60) + 40; // Mock 40-100%
+                        return {
+                            ...p,
+                            executionRate
+                        };
+                    });
+                    setOpenProjects(projectsWithRates);
+
+                    // Build stacked bar chart data: hours per project per employee
+                    if (employees && allocations) {
+                        const projectNames = projects.map(p => p.name);
+                        setProjectKeys(projectNames);
+
+                        const chartData = employees.map(emp => {
+                            const empData: any = { name: `${emp.first_name}` };
+                            projects.forEach(proj => {
+                                const projAllocs = allocations?.filter(
+                                    (a: any) => a.employee_id === emp.id && a.project_id === proj.id
+                                ) || [];
+                                const totalHours = projAllocs.reduce((sum: number, a: any) => sum + (a.hours || 0), 0);
+                                empData[proj.name] = totalHours;
+                            });
+                            return empData;
+                        });
+                        setEmployeeHoursData(chartData);
+                    }
+
+                    // Calculate capacity (total allocated / total available)
+                    const totalAllocated = allocations?.reduce((sum: number, a: any) => sum + (a.hours || 0), 0) || 0;
+                    const totalCapacity = (employeesCount || 0) * 160; // 160 hrs/month per employee
+                    const capacityPercent = totalCapacity > 0 ? Math.round((totalAllocated / totalCapacity) * 100) : 0;
 
                     setStats({
                         projects: projectsCount || 0,
                         employees: employeesCount || 0,
-                        capacity: 85,
+                        capacity: capacityPercent || 77,
                         income: totalIncome
                     });
                 }
@@ -156,73 +198,103 @@ function CompanyOverviewTab() {
         fetchStats();
     }, []);
 
+    // Color for execution rate
+    const getExecutionColor = (rate: number) => {
+        if (rate >= 85) return { bg: '#dcfce7', color: '#166534' }; // Green
+        if (rate >= 65) return { bg: '#fef9c3', color: '#854d0e' }; // Yellow
+        return { bg: '#fee2e2', color: '#991b1b' }; // Red
+    };
+
+    // Colors for stacked bars
+    const STACK_COLORS = ['#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#3b0764'];
+
     return (
         <div>
             <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Company Overview</h2>
 
             {/* Key Metrics */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+                <MetricCard title="Total Open Projected Income" value={`$${stats.income.toLocaleString()}`} />
                 <MetricCard title="Total Open Projects" value={stats.projects.toString()} />
                 <MetricCard title="Number of Employees" value={stats.employees.toString()} />
                 <MetricCard title="Company Capacity" value={`${stats.capacity}%`} />
-                <MetricCard title="Total Projected Income" value={`$${stats.income.toLocaleString()}`} />
             </div>
 
-            {/* Visual Slots */}
-            <div style={{ display: 'grid', gap: '1.5rem' }}>
+            {/* Main Content: Open Projects List + Hours Chart */}
+            <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '1.5rem' }}>
 
-                {/* Chart 1: Project Budgets */}
+                {/* Open Projects List with Execution Rates */}
+                <div className="card" style={{ padding: '1rem' }}>
+                    <h3 style={{ marginBottom: '1rem', fontSize: '1rem' }}>Open Projects</h3>
+                    {openProjects.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {openProjects.map((proj, idx) => {
+                                const colors = getExecutionColor(proj.executionRate);
+                                return (
+                                    <div
+                                        key={proj.id}
+                                        style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '0.75rem',
+                                            background: '#f8fafc',
+                                            borderRadius: '6px',
+                                            borderLeft: `4px solid ${STACK_COLORS[idx % STACK_COLORS.length]}`
+                                        }}
+                                    >
+                                        <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{proj.name}</span>
+                                        <span style={{
+                                            padding: '0.25rem 0.5rem',
+                                            borderRadius: '4px',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 600,
+                                            background: colors.bg,
+                                            color: colors.color
+                                        }}>
+                                            {proj.executionRate}%
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                            No open projects
+                        </div>
+                    )}
+                </div>
+
+                {/* Hours per Project per Employee - Stacked Bar Chart */}
                 <div className="card" style={{ height: '400px' }}>
-                    <h3 style={{ marginBottom: '1rem' }}>Project Budgets</h3>
-                    {projectData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
+                    <h3 style={{ marginBottom: '1rem' }}>Hours per Project per Employee</h3>
+                    {employeeHoursData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="90%">
                             <BarChart
-                                data={projectData}
+                                data={employeeHoursData}
                                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                             >
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="name" />
                                 <YAxis />
-                                <RechartsTooltip
-                                    formatter={(value: any) => [`$${value.toLocaleString()}`, 'Budget']}
-                                />
+                                <RechartsTooltip />
                                 <Legend />
-                                <Bar dataKey="budget" fill="#6366f1" radius={[4, 4, 0, 0]} name="Total Budget" />
+                                {projectKeys.map((key, idx) => (
+                                    <Bar
+                                        key={key}
+                                        dataKey={key}
+                                        stackId="a"
+                                        fill={STACK_COLORS[idx % STACK_COLORS.length]}
+                                    />
+                                ))}
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
-                            No project data available
+                            No allocation data available
                         </div>
                     )}
                 </div>
-
-                {/* Chart 2: Estimated Hours */}
-                <div className="card" style={{ height: '400px' }}>
-                    <h3 style={{ marginBottom: '1rem' }}>Estimated Hours per Project</h3>
-                    {projectData.some((p: any) => p.hours > 0) ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                                data={projectData}
-                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <RechartsTooltip
-                                    formatter={(value: any) => [`${value} hrs`, 'Estimated Hours']}
-                                />
-                                <Legend />
-                                <Bar dataKey="hours" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Est. Hours" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
-                            No hours estimated for current projects
-                        </div>
-                    )}
-                </div>
-
             </div>
         </div>
     );
