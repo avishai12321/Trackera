@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase, getCompanySchema } from '@/lib/supabase';
 import DashboardLayout from '../../components/DashboardLayout';
 import {
-    Plus, Calendar as CalendarIcon, Loader, ChevronLeft, ChevronRight,
-    Settings, X, Check, Clock, RefreshCw, Eye, EyeOff, Users, MapPin, Video, ExternalLink
+    Plus, Loader, ChevronLeft, ChevronRight,
+    Settings, X, Clock, RefreshCw, Users, MapPin, Video
 } from 'lucide-react';
 
 interface Attendee {
@@ -20,13 +20,14 @@ interface Attendee {
 
 interface CalendarEvent {
     id: string;
+    timeEntryId?: string; // The actual time entry ID in the database
     title: string;
     description?: string | null;
     startTime: string;
     endTime: string;
     durationMinutes: number;
     source: 'google' | 'manual';
-    projectId?: string;
+    projectId?: string | null;
     confirmed?: boolean;
     location?: string | null;
     organizer?: string | null;
@@ -148,6 +149,20 @@ function CalendarContent() {
         }
     }, []);
 
+    // Global mouse up handler to end drag even if mouse is released outside table
+    useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            if (isDragging) {
+                handleCellMouseUp();
+            }
+        };
+
+        document.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => {
+            document.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, [isDragging, dragStart, dragEnd]);
+
     const saveWorkingHours = (hours: WorkingHours) => {
         setWorkingHours(hours);
         localStorage.setItem('workingHours', JSON.stringify(hours));
@@ -207,8 +222,9 @@ function CalendarContent() {
             const startDate = currentWeekStart.toISOString().split('T')[0];
             const endDate = new Date(currentWeekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
+            // Fetch calendar suggestions (Google/Microsoft events that haven't been assigned yet)
             const sRes = await axios.get(`http://localhost:3000/time-entries/suggestions?startDate=${startDate}&endDate=${endDate}`, config);
-            setCalendarEvents(sRes.data.map((s: any) => ({
+            const calendarSuggestions = sRes.data.map((s: any) => ({
                 id: s.id,
                 title: s.title,
                 description: s.description || null,
@@ -216,15 +232,54 @@ function CalendarContent() {
                 endTime: s.endTime,
                 durationMinutes: s.durationMinutes,
                 source: 'google',
-                projectId: s.projectId,
-                confirmed: s.confirmed || false,
+                projectId: null, // Suggestions are unassigned
+                confirmed: false,
                 location: s.location || null,
                 organizer: s.organizer || null,
                 attendees: s.attendees || [],
                 attendeesCount: s.attendeesCount || 0,
                 conferenceLink: s.conferenceLink || null,
                 eventStatus: s.eventStatus || 'confirmed'
-            })));
+            }));
+
+            // Fetch ALL time entries (both manual and calendar-linked)
+            let allTimeEntries: any[] = [];
+            try {
+                const timeEntriesRes = await axios.get(`http://localhost:3000/time-entries?from=${startDate}&to=${endDate}`, config);
+                console.log('Time entries response:', timeEntriesRes.data);
+                allTimeEntries = (timeEntriesRes.data || [])
+                    .filter((entry: any) => entry.start_time && entry.end_time) // Only include entries with valid times
+                    .map((entry: any) => {
+                        // Check if this is linked to a calendar event or is manual
+                        const isCalendarLinked = entry.calendar_event_id != null;
+
+                        return {
+                            id: isCalendarLinked ? entry.calendar_event_id : `time-${entry.id}`, // Use calendar event ID if linked, otherwise use time entry ID
+                            timeEntryId: entry.id, // Store the actual time entry ID
+                            title: entry.description || entry.project?.name || 'Time Entry',
+                            description: entry.description || null,
+                            startTime: entry.start_time,
+                            endTime: entry.end_time,
+                            durationMinutes: entry.minutes,
+                            source: isCalendarLinked ? 'google' : 'manual', // Mark calendar-linked entries appropriately
+                            projectId: entry.project_id,
+                            confirmed: true, // All time entries are confirmed (they're already in the DB)
+                            location: null,
+                            organizer: null,
+                            attendees: [],
+                            attendeesCount: 0,
+                            conferenceLink: null,
+                            eventStatus: 'confirmed'
+                        };
+                    });
+                console.log('Mapped time entries:', allTimeEntries);
+            } catch (timeEntriesError) {
+                console.warn('Failed to fetch time entries:', timeEntriesError);
+                // Continue without time entries
+            }
+
+            // Combine unassigned calendar suggestions with all time entries (assigned calendar events + manual)
+            setCalendarEvents([...calendarSuggestions, ...allTimeEntries]);
         } catch (err) {
             console.error(err);
         } finally {
@@ -295,15 +350,56 @@ function CalendarContent() {
         const slotDuration = workingHours.slotDuration;
         return calendarEvents.filter(event => {
             const eventStart = new Date(event.startTime);
+            const eventEnd = new Date(event.endTime);
             const eventHour = eventStart.getHours();
             const eventMinute = eventStart.getMinutes();
-            // Check if event falls within this time slot
-            const eventTotalMinutes = eventHour * 60 + eventMinute;
-            const slotTotalMinutes = hour * 60 + minute;
+
+            // Check if event starts within this time slot
+            const eventStartMinutes = eventHour * 60 + eventMinute;
+            const slotStartMinutes = hour * 60 + minute;
+            const slotEndMinutes = slotStartMinutes + slotDuration;
+
             return eventStart.toDateString() === date.toDateString() &&
-                eventTotalMinutes >= slotTotalMinutes &&
-                eventTotalMinutes < slotTotalMinutes + slotDuration;
+                eventStartMinutes >= slotStartMinutes &&
+                eventStartMinutes < slotEndMinutes;
         });
+    };
+
+    // Calculate how many slots an event spans
+    const getEventSlotSpan = (event: CalendarEvent) => {
+        const eventStart = new Date(event.startTime);
+        const eventEnd = new Date(event.endTime);
+        const durationMs = eventEnd.getTime() - eventStart.getTime();
+        const durationMinutes = Math.round(durationMs / (1000 * 60));
+        const slotsSpanned = Math.ceil(durationMinutes / workingHours.slotDuration);
+        return slotsSpanned;
+    };
+
+    // Check if this slot should display an event (is the first slot of that event)
+    const isEventStartSlot = (event: CalendarEvent, slotHour: number, slotMinute: number) => {
+        const eventStart = new Date(event.startTime);
+        const eventStartMinutes = eventStart.getHours() * 60 + eventStart.getMinutes();
+        const slotStartMinutes = slotHour * 60 + slotMinute;
+        const slotEndMinutes = slotStartMinutes + workingHours.slotDuration;
+
+        // Event should be displayed in the slot where it starts
+        return eventStartMinutes >= slotStartMinutes && eventStartMinutes < slotEndMinutes;
+    };
+
+    // Calculate the offset position within the slot (in pixels)
+    const getEventOffsetInSlot = (event: CalendarEvent, slotHour: number, slotMinute: number) => {
+        const eventStart = new Date(event.startTime);
+        const eventStartMinutes = eventStart.getHours() * 60 + eventStart.getMinutes();
+        const slotStartMinutes = slotHour * 60 + slotMinute;
+
+        // Calculate how many minutes into the slot the event starts
+        const minutesIntoSlot = eventStartMinutes - slotStartMinutes;
+
+        // Calculate the pixel offset based on slot duration
+        const heightPerSlot = workingHours.slotDuration <= 30 ? 40 : 60;
+        const pixelsPerMinute = heightPerSlot / workingHours.slotDuration;
+
+        return minutesIntoSlot * pixelsPerMinute;
     };
 
     // Get time slots for a specific day and hour
@@ -433,7 +529,8 @@ function CalendarContent() {
                         endTime,
                         durationMinutes,
                         billable: true,
-                        confirmed: false
+                        confirmed: false,
+                        calendarEventId: event.source === 'google' ? event.id : undefined // Link to calendar event
                     }, {
                         headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
                     });
@@ -441,26 +538,10 @@ function CalendarContent() {
             }
             setSelectedSlots(new Set());
             setShowProjectModal(false);
-            fetchData();
+            await fetchData(); // Wait for refresh to show updated colors
         } catch (err) {
+            console.error('Failed to assign project:', err);
             alert('Failed to assign project');
-        }
-    };
-
-    // Confirm a time entry
-    const confirmTimeEntry = async (eventId: string) => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-        const token = session.access_token;
-        const tenantId = session.user.user_metadata?.company_id;
-
-        try {
-            await axios.patch(`http://localhost:3000/time-entries/${eventId}/confirm`, {}, {
-                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
-            });
-            fetchData();
-        } catch (err) {
-            alert('Failed to confirm entry');
         }
     };
 
@@ -474,16 +555,46 @@ function CalendarContent() {
         const tenantId = session.user.user_metadata?.company_id;
 
         const date = weekDates[addSlotData.dayIndex];
-        const startTime = new Date(date);
+        let startTime = new Date(date);
         startTime.setHours(addSlotData.hour, addSlotData.minute, 0, 0);
 
-        const endTime = new Date(date);
+        let endTime = new Date(date);
         if (addSlotData.endHour !== undefined && addSlotData.endMinute !== undefined) {
             // Multi-slot drag - use specified end time
             endTime.setHours(addSlotData.endHour, addSlotData.endMinute, 0, 0);
         } else {
             // Single slot - use slot duration
             endTime.setHours(addSlotData.hour, addSlotData.minute + workingHours.slotDuration, 0, 0);
+        }
+
+        // Check for overlapping events and adjust start time if needed
+        const overlappingEvents = calendarEvents.filter(event => {
+            const eventStart = new Date(event.startTime);
+            const eventEnd = new Date(event.endTime);
+            const isSameDay = eventStart.toDateString() === date.toDateString();
+
+            // Check if there's any overlap
+            return isSameDay && (
+                (startTime >= eventStart && startTime < eventEnd) || // New start is during an event
+                (endTime > eventStart && endTime <= eventEnd) || // New end is during an event
+                (startTime <= eventStart && endTime >= eventEnd) // New event completely contains an existing event
+            );
+        });
+
+        // If there are overlapping events, adjust the start time to after the last overlapping event
+        if (overlappingEvents.length > 0) {
+            // Find the latest end time among overlapping events
+            const latestEndTime = overlappingEvents.reduce((latest, event) => {
+                const eventEnd = new Date(event.endTime);
+                return eventEnd > latest ? eventEnd : latest;
+            }, new Date(0));
+
+            // Set the new start time to be right after the last event ends
+            startTime = new Date(latestEndTime);
+
+            // Recalculate end time based on the intended duration
+            const intendedDuration = endTime.getTime() - new Date(date).setHours(addSlotData.hour, addSlotData.minute, 0, 0);
+            endTime = new Date(startTime.getTime() + intendedDuration);
         }
 
         const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
@@ -759,7 +870,8 @@ function CalendarContent() {
                                                     minWidth: '120px',
                                                     padding: '0.75rem 0.5rem',
                                                     background: '#f8fafc',
-                                                    borderBottom: '1px solid #e2e8f0'
+                                                    borderBottom: '1px solid #e2e8f0',
+                                                    textAlign: 'center'
                                                 }}
                                             >
                                                 <div style={{ fontWeight: 600 }}>{shortDays[originalIdx]}</div>
@@ -797,106 +909,165 @@ function CalendarContent() {
                                                 <td
                                                     key={dayIdx}
                                                     onClick={() => events.length === 0 && handleEmptyCellClick(dayIdx, slot.hour, slot.minute)}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault(); // Prevent text selection during drag
+                                                        handleCellMouseDown(dayIdx, slotIdx, events);
+                                                    }}
+                                                    onMouseEnter={() => handleCellMouseEnter(dayIdx, slotIdx)}
+                                                    onMouseUp={handleCellMouseUp}
                                                     style={{
-                                                        padding: '0.25rem',
+                                                        padding: '0.5rem',
                                                         borderBottom: '1px solid #e2e8f0',
                                                         borderRight: '1px solid #f1f5f9',
-                                                        background: 'white',
+                                                        background: isCellInDragSelection(dayIdx, slotIdx)
+                                                            ? '#dbeafe'
+                                                            : 'white',
                                                         verticalAlign: 'top',
                                                         height: rowHeight,
-                                                        cursor: events.length === 0 ? 'pointer' : 'default'
+                                                        cursor: events.length === 0
+                                                            ? (isDragging ? 'cell' : 'pointer')
+                                                            : 'default',
+                                                        userSelect: 'none', // Prevent text selection during drag
+                                                        position: 'relative',
+                                                        textAlign: 'center'
                                                     }}
                                                 >
-                                                    {events.map(event => (
-                                                        <div
-                                                            key={event.id}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleSlotClick(event.id, e);
-                                                            }}
-                                                            style={{
-                                                                padding: '0.25rem 0.5rem',
-                                                                marginBottom: '0.25rem',
-                                                                borderRadius: '4px',
-                                                                fontSize: '0.7rem',
-                                                                cursor: 'pointer',
-                                                                background: selectedSlots.has(event.id)
-                                                                    ? '#3b82f6'
-                                                                    : event.projectId
-                                                                        ? (event.confirmed ? '#dcfce7' : '#fef3c7')
-                                                                        : '#e0e7ff',
-                                                                color: selectedSlots.has(event.id)
-                                                                    ? 'white'
-                                                                    : event.projectId
-                                                                        ? (event.confirmed ? '#166534' : '#92400e')
-                                                                        : '#3730a3',
-                                                                border: selectedSlots.has(event.id) ? '2px solid #1d4ed8' : 'none',
-                                                                display: 'flex',
-                                                                justifyContent: 'space-between',
-                                                                alignItems: 'center',
-                                                                gap: '0.25rem'
-                                                            }}
-                                                        >
-                                                            <span style={{
-                                                                overflow: 'hidden',
-                                                                textOverflow: 'ellipsis',
-                                                                whiteSpace: 'nowrap',
-                                                                flex: 1
-                                                            }}>
-                                                                {event.title}
-                                                            </span>
-                                                            {/* Attendee & Conference indicators */}
-                                                            {(event.attendeesCount && event.attendeesCount > 1) && (
-                                                                <span style={{
+                                                    {events.map(event => {
+                                                        // Only render the event in its starting slot
+                                                        if (!isEventStartSlot(event, slot.hour, slot.minute)) {
+                                                            return null;
+                                                        }
+
+                                                        const slotsSpanned = getEventSlotSpan(event);
+                                                        const heightPerSlot = workingHours.slotDuration <= 30 ? 40 : 60;
+                                                        const eventHeight = slotsSpanned * heightPerSlot - 8; // -8 for padding/margin
+                                                        const offsetTop = getEventOffsetInSlot(event, slot.hour, slot.minute);
+
+                                                        // Determine event colors based on assignment status
+                                                        let backgroundColor, textColor, borderColor;
+                                                        if (selectedSlots.has(event.id)) {
+                                                            // Selected state
+                                                            backgroundColor = '#3b82f6';
+                                                            textColor = 'white';
+                                                            borderColor = '#1d4ed8';
+                                                        } else if (event.projectId) {
+                                                            // Assigned to a project (both manual and calendar-linked)
+                                                            if (event.source === 'manual') {
+                                                                // Manual time entries
+                                                                backgroundColor = '#10b981'; // Emerald green
+                                                                textColor = 'white';
+                                                            } else {
+                                                                // Calendar events assigned to project
+                                                                backgroundColor = '#22c55e'; // Bright green
+                                                                textColor = 'white';
+                                                            }
+                                                            borderColor = 'none';
+                                                        } else {
+                                                            // Unassigned calendar event
+                                                            backgroundColor = '#e0e7ff'; // Light indigo
+                                                            textColor = '#3730a3';
+                                                            borderColor = 'none';
+                                                        }
+
+                                                        return (
+                                                            <div
+                                                                key={event.id}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleSlotClick(event.id, e);
+                                                                }}
+                                                                style={{
+                                                                    padding: '0.25rem 0.5rem',
+                                                                    marginBottom: '0.25rem',
+                                                                    borderRadius: '4px',
+                                                                    fontSize: '0.7rem',
+                                                                    cursor: 'pointer',
+                                                                    background: backgroundColor,
+                                                                    color: textColor,
+                                                                    border: selectedSlots.has(event.id) ? `2px solid ${borderColor}` : 'none',
                                                                     display: 'flex',
+                                                                    justifyContent: 'space-between',
+                                                                    alignItems: 'flex-start',
+                                                                    gap: '0.25rem',
+                                                                    textAlign: 'left',
+                                                                    position: 'absolute',
+                                                                    left: '0.5rem',
+                                                                    right: '0.5rem',
+                                                                    top: `${offsetTop}px`,
+                                                                    height: `${eventHeight}px`,
+                                                                    zIndex: 5,
+                                                                    overflow: 'hidden',
+                                                                    flexDirection: 'column',
+                                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                                                                }}
+                                                            >
+                                                                <div style={{
+                                                                    display: 'flex',
+                                                                    justifyContent: 'space-between',
                                                                     alignItems: 'center',
-                                                                    gap: '2px',
-                                                                    fontSize: '0.6rem',
-                                                                    opacity: 0.7
-                                                                }} title={`${event.attendeesCount} attendees`}>
-                                                                    <Users size={10} />
-                                                                    {event.attendeesCount}
-                                                                </span>
-                                                            )}
-                                                            {event.conferenceLink && (
-                                                                <span title="Has video call">
-                                                                    <Video size={10} style={{ opacity: 0.7 }} />
-                                                                </span>
-                                                            )}
-                                                            {event.projectId && !event.confirmed && (
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        confirmTimeEntry(event.id);
-                                                                    }}
-                                                                    style={{
-                                                                        background: '#10b981',
-                                                                        color: 'white',
-                                                                        border: 'none',
-                                                                        borderRadius: '3px',
-                                                                        padding: '2px 4px',
-                                                                        cursor: 'pointer',
-                                                                        display: 'flex',
-                                                                        alignItems: 'center'
-                                                                    }}
-                                                                    title="Confirm"
-                                                                >
-                                                                    <Check size={10} />
-                                                                </button>
-                                                            )}
-                                                            {event.confirmed && (
-                                                                <Check size={12} style={{ color: '#166534' }} />
-                                                            )}
-                                                        </div>
-                                                    ))}
+                                                                    width: '100%',
+                                                                    gap: '0.25rem'
+                                                                }}>
+                                                                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                                        <div style={{
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                            whiteSpace: 'nowrap',
+                                                                            fontWeight: 500
+                                                                        }}>
+                                                                            {event.title}
+                                                                        </div>
+                                                                        <div style={{
+                                                                            fontSize: '0.6rem',
+                                                                            opacity: 0.85,
+                                                                            marginTop: '1px'
+                                                                        }}>
+                                                                            {new Date(event.startTime).toLocaleTimeString('en-US', {
+                                                                                hour: 'numeric',
+                                                                                minute: '2-digit',
+                                                                                hour12: true
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                                                        {/* Attendee & Conference indicators */}
+                                                                        {(event.attendeesCount && event.attendeesCount > 1) && (
+                                                                            <span style={{
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                gap: '2px',
+                                                                                fontSize: '0.6rem',
+                                                                                opacity: 0.7
+                                                                            }} title={`${event.attendeesCount} attendees`}>
+                                                                                <Users size={10} />
+                                                                                {event.attendeesCount}
+                                                                            </span>
+                                                                        )}
+                                                                        {event.conferenceLink && (
+                                                                            <span title="Has video call">
+                                                                                <Video size={10} style={{ opacity: 0.7 }} />
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                {/* Show time duration if event spans multiple slots */}
+                                                                {slotsSpanned > 1 && (
+                                                                    <div style={{
+                                                                        fontSize: '0.65rem',
+                                                                        opacity: 0.8,
+                                                                        marginTop: '0.125rem'
+                                                                    }}>
+                                                                        {event.durationMinutes} min
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                     {events.length === 0 && (
                                                         <div style={{
-                                                            height: '100%',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
                                                             color: '#cbd5e1',
-                                                            fontSize: workingHours.slotDuration <= 30 ? '1rem' : '1.25rem'
+                                                            fontSize: workingHours.slotDuration <= 30 ? '1rem' : '1.25rem',
+                                                            pointerEvents: 'none'
                                                         }}>
                                                             +
                                                         </div>
@@ -913,18 +1084,18 @@ function CalendarContent() {
             </div>
 
             {/* Legend */}
-            <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#64748b' }}>
+            <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', fontSize: '0.75rem', color: '#64748b', flexWrap: 'wrap' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                     <span style={{ width: '12px', height: '12px', background: '#e0e7ff', borderRadius: '2px' }}></span>
-                    Unassigned
+                    Calendar Event (Unassigned)
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ width: '12px', height: '12px', background: '#fef3c7', borderRadius: '2px' }}></span>
-                    Assigned (Pending)
+                    <span style={{ width: '12px', height: '12px', background: '#22c55e', borderRadius: '2px' }}></span>
+                    Calendar Event (Assigned)
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <span style={{ width: '12px', height: '12px', background: '#dcfce7', borderRadius: '2px' }}></span>
-                    Confirmed
+                    <span style={{ width: '12px', height: '12px', background: '#10b981', borderRadius: '2px' }}></span>
+                    Manual Time Entry
                 </span>
                 <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>
                     Click to view details • Shift+Click to assign • Ctrl+Click to multi-select
@@ -949,12 +1120,15 @@ function CalendarContent() {
                     dayIndex={addSlotData.dayIndex}
                     hour={addSlotData.hour}
                     minute={addSlotData.minute}
+                    endHour={addSlotData.endHour}
+                    endMinute={addSlotData.endMinute}
                     weekDates={weekDates}
                     projects={projects}
                     employees={employees}
                     formatTimeSlot={formatTimeSlot}
                     shortDays={shortDays}
                     slotDuration={workingHours.slotDuration}
+                    calendarEvents={calendarEvents}
                     onClose={() => { setShowAddSlotModal(false); setAddSlotData(null); }}
                     onAdd={addManualSlot}
                 />
@@ -1152,6 +1326,8 @@ function AddSlotModal({
     dayIndex,
     hour,
     minute,
+    endHour,
+    endMinute,
     weekDates,
     projects,
     employees,
@@ -1159,11 +1335,14 @@ function AddSlotModal({
     shortDays,
     slotDuration,
     onClose,
-    onAdd
+    onAdd,
+    calendarEvents
 }: {
     dayIndex: number;
     hour: number;
     minute: number;
+    endHour?: number;
+    endMinute?: number;
     weekDates: Date[];
     projects: Project[];
     employees: Employee[];
@@ -1172,6 +1351,7 @@ function AddSlotModal({
     slotDuration: number;
     onClose: () => void;
     onAdd: (projectId: string, employeeId: string, description: string) => void;
+    calendarEvents?: CalendarEvent[];
 }) {
     const [selectedProject, setSelectedProject] = useState('');
     const [selectedEmployee, setSelectedEmployee] = useState('');
@@ -1188,9 +1368,38 @@ function AddSlotModal({
 
     // Format duration for display
     const formatDuration = (mins: number) => {
-        if (mins >= 60) return `${mins / 60} hour${mins > 60 ? 's' : ''}`;
-        return `${mins} minutes`;
+        const hours = Math.floor(mins / 60);
+        const minutes = mins % 60;
+        if (hours > 0 && minutes > 0) return `${hours} hour${hours > 1 ? 's' : ''} ${minutes} min`;
+        if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
+        return `${minutes} minutes`;
     };
+
+    // Check for overlapping events
+    const date = weekDates[dayIndex];
+    const startTime = new Date(date);
+    startTime.setHours(hour, minute, 0, 0);
+
+    const endTimeCalc = new Date(date);
+    if (endHour !== undefined && endMinute !== undefined) {
+        endTimeCalc.setHours(endHour, endMinute, 0, 0);
+    } else {
+        endTimeCalc.setHours(hour, minute + slotDuration, 0, 0);
+    }
+
+    const overlappingEvents = calendarEvents?.filter(event => {
+        const eventStart = new Date(event.startTime);
+        const eventEnd = new Date(event.endTime);
+        const isSameDay = eventStart.toDateString() === date.toDateString();
+
+        return isSameDay && (
+            (startTime >= eventStart && startTime < eventEnd) ||
+            (endTimeCalc > eventStart && endTimeCalc <= eventEnd) ||
+            (startTime <= eventStart && endTimeCalc >= eventEnd)
+        );
+    }) || [];
+
+    const hasOverlap = overlappingEvents.length > 0;
 
     return (
         <div style={{
@@ -1220,10 +1429,31 @@ function AddSlotModal({
                 </div>
 
                 <p style={{ color: '#64748b', marginBottom: '1rem', fontSize: '0.875rem' }}>
-                    {shortDays[dayIndex]}, {weekDates[dayIndex].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} at {formatTimeSlot(hour, minute)}
+                    {shortDays[dayIndex]}, {weekDates[dayIndex].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     <br />
-                    <span style={{ fontSize: '0.8rem' }}>Duration: {formatDuration(slotDuration)}</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#475569' }}>
+                        {formatTimeSlot(hour, minute)} - {endHour !== undefined && endMinute !== undefined ? formatTimeSlot(endHour, endMinute) : formatTimeSlot(hour, minute + slotDuration)}
+                    </span>
+                    <br />
+                    <span style={{ fontSize: '0.8rem' }}>
+                        Duration: {formatDuration(endHour !== undefined && endMinute !== undefined ? ((endHour * 60 + endMinute) - (hour * 60 + minute)) : slotDuration)}
+                    </span>
                 </p>
+
+                {/* Overlap Warning */}
+                {hasOverlap && (
+                    <div style={{
+                        background: '#fef3c7',
+                        border: '1px solid #f59e0b',
+                        borderRadius: '6px',
+                        padding: '0.75rem',
+                        marginBottom: '1rem',
+                        fontSize: '0.8rem',
+                        color: '#92400e'
+                    }}>
+                        <strong>Note:</strong> This time slot overlaps with {overlappingEvents.length} existing event{overlappingEvents.length > 1 ? 's' : ''}. The start time will be automatically adjusted to begin after the last conflicting event ends.
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit}>
                     <div style={{ marginBottom: '1rem' }}>
