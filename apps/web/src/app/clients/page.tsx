@@ -283,7 +283,7 @@ export default function Clients() {
                                                     <input
                                                         type="text"
                                                         value={editData.name || ''}
-                                                        onChange={e => setEditData({...editData, name: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, name: e.target.value })}
                                                         style={{ width: '120px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -291,7 +291,7 @@ export default function Clients() {
                                                     <input
                                                         type="text"
                                                         value={editData.code || ''}
-                                                        onChange={e => setEditData({...editData, code: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, code: e.target.value })}
                                                         style={{ width: '60px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -299,7 +299,7 @@ export default function Clients() {
                                                     <input
                                                         type="text"
                                                         value={editData.contact_person || ''}
-                                                        onChange={e => setEditData({...editData, contact_person: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, contact_person: e.target.value })}
                                                         style={{ width: '100px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -307,7 +307,7 @@ export default function Clients() {
                                                     <input
                                                         type="email"
                                                         value={editData.email || ''}
-                                                        onChange={e => setEditData({...editData, email: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, email: e.target.value })}
                                                         style={{ width: '140px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -315,7 +315,7 @@ export default function Clients() {
                                                     <input
                                                         type="tel"
                                                         value={editData.phone || ''}
-                                                        onChange={e => setEditData({...editData, phone: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, phone: e.target.value })}
                                                         style={{ width: '100px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -325,14 +325,14 @@ export default function Clients() {
                                                             type="text"
                                                             placeholder="City"
                                                             value={editData.city || ''}
-                                                            onChange={e => setEditData({...editData, city: e.target.value})}
+                                                            onChange={e => setEditData({ ...editData, city: e.target.value })}
                                                             style={{ width: '80px', padding: '0.25rem' }}
                                                         />
                                                         <input
                                                             type="text"
                                                             placeholder="Country"
                                                             value={editData.country || ''}
-                                                            onChange={e => setEditData({...editData, country: e.target.value})}
+                                                            onChange={e => setEditData({ ...editData, country: e.target.value })}
                                                             style={{ width: '80px', padding: '0.25rem' }}
                                                         />
                                                     </div>
@@ -341,14 +341,14 @@ export default function Clients() {
                                                     <input
                                                         type="number"
                                                         value={editData.default_billing_rate || ''}
-                                                        onChange={e => setEditData({...editData, default_billing_rate: e.target.value ? parseFloat(e.target.value) : null})}
+                                                        onChange={e => setEditData({ ...editData, default_billing_rate: e.target.value ? parseFloat(e.target.value) : null })}
                                                         style={{ width: '80px', padding: '0.25rem' }}
                                                     />
                                                 </td>
                                                 <td>
                                                     <select
                                                         value={editData.status || 'ACTIVE'}
-                                                        onChange={e => setEditData({...editData, status: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, status: e.target.value })}
                                                         style={{ width: '80px', padding: '0.25rem' }}
                                                     >
                                                         <option value="ACTIVE">ACTIVE</option>
@@ -361,7 +361,7 @@ export default function Clients() {
                                             <>
                                                 <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
                                                     <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                                        <button onClick={() => startEdit(client)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#3b82f6', color: 'white' }}>
+                                                        <button onClick={() => startEdit(client)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#6366f1', color: 'white' }}>
                                                             <Edit2 size={14} />
                                                         </button>
                                                         <button onClick={() => handleDelete(client.id)} className="btn btn-danger" style={{ padding: '0.25rem 0.5rem' }}>
@@ -399,8 +399,8 @@ export default function Clients() {
                                                         padding: '2px 8px',
                                                         borderRadius: '999px',
                                                         fontSize: '0.75rem',
-                                                        background: client.status === 'ACTIVE' ? '#dbeafe' : client.status === 'INACTIVE' ? '#fee2e2' : '#f3f4f6',
-                                                        color: client.status === 'ACTIVE' ? '#1e40af' : client.status === 'INACTIVE' ? '#991b1b' : '#4b5563'
+                                                        background: client.status === 'ACTIVE' ? '#eef2ff' : client.status === 'INACTIVE' ? '#fee2e2' : '#f3f4f6',
+                                                        color: client.status === 'ACTIVE' ? '#4338ca' : client.status === 'INACTIVE' ? '#dc2626' : '#4b5563'
                                                     }}>
                                                         {client.status}
                                                     </span>
@@ -456,15 +456,15 @@ export default function Clients() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Name *</label>
-                                        <input type="text" placeholder="Client Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+                                        <input type="text" placeholder="Client Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Code</label>
-                                        <input type="text" placeholder="CLI-001" value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} />
+                                        <input type="text" placeholder="CLI-001" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Contact Person</label>
-                                        <input type="text" placeholder="John Doe" value={formData.contactPerson} onChange={e => setFormData({...formData, contactPerson: e.target.value})} />
+                                        <input type="text" placeholder="John Doe" value={formData.contactPerson} onChange={e => setFormData({ ...formData, contactPerson: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -475,11 +475,11 @@ export default function Clients() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Email</label>
-                                        <input type="email" placeholder="client@example.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                        <input type="email" placeholder="client@example.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Phone</label>
-                                        <input type="tel" placeholder="+1234567890" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                                        <input type="tel" placeholder="+1234567890" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -490,23 +490,23 @@ export default function Clients() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Address</label>
-                                        <input type="text" placeholder="123 Main St" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+                                        <input type="text" placeholder="123 Main St" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>City</label>
-                                        <input type="text" placeholder="New York" value={formData.city} onChange={e => setFormData({...formData, city: e.target.value})} />
+                                        <input type="text" placeholder="New York" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>State</label>
-                                        <input type="text" placeholder="NY" value={formData.state} onChange={e => setFormData({...formData, state: e.target.value})} />
+                                        <input type="text" placeholder="NY" value={formData.state} onChange={e => setFormData({ ...formData, state: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Postal Code</label>
-                                        <input type="text" placeholder="10001" value={formData.postalCode} onChange={e => setFormData({...formData, postalCode: e.target.value})} />
+                                        <input type="text" placeholder="10001" value={formData.postalCode} onChange={e => setFormData({ ...formData, postalCode: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Country</label>
-                                        <input type="text" placeholder="USA" value={formData.country} onChange={e => setFormData({...formData, country: e.target.value})} />
+                                        <input type="text" placeholder="USA" value={formData.country} onChange={e => setFormData({ ...formData, country: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -517,15 +517,15 @@ export default function Clients() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Registration Number</label>
-                                        <input type="text" placeholder="123456789" value={formData.companyRegistrationNumber} onChange={e => setFormData({...formData, companyRegistrationNumber: e.target.value})} />
+                                        <input type="text" placeholder="123456789" value={formData.companyRegistrationNumber} onChange={e => setFormData({ ...formData, companyRegistrationNumber: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Tax ID</label>
-                                        <input type="text" placeholder="XX-XXXXXXX" value={formData.taxId} onChange={e => setFormData({...formData, taxId: e.target.value})} />
+                                        <input type="text" placeholder="XX-XXXXXXX" value={formData.taxId} onChange={e => setFormData({ ...formData, taxId: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>VAT Number</label>
-                                        <input type="text" placeholder="EU123456789" value={formData.vatNumber} onChange={e => setFormData({...formData, vatNumber: e.target.value})} />
+                                        <input type="text" placeholder="EU123456789" value={formData.vatNumber} onChange={e => setFormData({ ...formData, vatNumber: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -536,11 +536,11 @@ export default function Clients() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Default Billing Rate</label>
-                                        <input type="number" step="0.01" placeholder="150.00" value={formData.defaultBillingRate} onChange={e => setFormData({...formData, defaultBillingRate: e.target.value})} />
+                                        <input type="number" step="0.01" placeholder="150.00" value={formData.defaultBillingRate} onChange={e => setFormData({ ...formData, defaultBillingRate: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
-                                        <select value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
+                                        <select value={formData.currency} onChange={e => setFormData({ ...formData, currency: e.target.value })}>
                                             <option value="USD">USD</option>
                                             <option value="EUR">EUR</option>
                                             <option value="GBP">GBP</option>
@@ -549,7 +549,7 @@ export default function Clients() {
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Payment Terms</label>
-                                        <input type="text" placeholder="Net 30" value={formData.paymentTerms} onChange={e => setFormData({...formData, paymentTerms: e.target.value})} />
+                                        <input type="text" placeholder="Net 30" value={formData.paymentTerms} onChange={e => setFormData({ ...formData, paymentTerms: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -560,15 +560,15 @@ export default function Clients() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr 2fr' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Contract Start Date</label>
-                                        <input type="date" value={formData.contractStartDate} onChange={e => setFormData({...formData, contractStartDate: e.target.value})} />
+                                        <input type="date" value={formData.contractStartDate} onChange={e => setFormData({ ...formData, contractStartDate: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Contract End Date</label>
-                                        <input type="date" value={formData.contractEndDate} onChange={e => setFormData({...formData, contractEndDate: e.target.value})} />
+                                        <input type="date" value={formData.contractEndDate} onChange={e => setFormData({ ...formData, contractEndDate: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Contract Notes</label>
-                                        <input type="text" placeholder="Additional contract details..." value={formData.contractNotes} onChange={e => setFormData({...formData, contractNotes: e.target.value})} />
+                                        <input type="text" placeholder="Additional contract details..." value={formData.contractNotes} onChange={e => setFormData({ ...formData, contractNotes: e.target.value })} />
                                     </div>
                                 </div>
                             </div>

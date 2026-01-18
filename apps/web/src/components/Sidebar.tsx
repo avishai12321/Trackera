@@ -2,13 +2,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Clock, Calendar, FileText, FolderKanban, LogOut, Upload, FileCheck, Users, Building2, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Clock, Calendar, FolderKanban, LogOut, Upload, FileCheck, Users, Building2, ClipboardList, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import styles from './Sidebar.module.scss';
 import clsx from 'clsx';
 import { useRouter } from 'next/navigation';
 import { signOut } from '@/lib/supabase';
 
-const coreMenuItems = [
+const mainMenuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { name: 'Employees', icon: Users, href: '/employees' },
     { name: 'Clients', icon: Building2, href: '/clients' },
@@ -17,11 +17,11 @@ const coreMenuItems = [
     { name: 'Calendar', icon: Calendar, href: '/calendar' },
 ];
 
-const extraMenuItems = [
-    { name: 'Time Entries', icon: Clock, href: '/time-entries', grey: true },
-    { name: 'Reports', icon: FileText, href: '/reports', grey: true },
-    { name: 'Import Data', icon: Upload, href: '/import', grey: true },
-    { name: 'Draft Records', icon: FileCheck, href: '/drafts', grey: true },
+const dataMenuItems = [
+    { name: 'Time Entries', icon: Clock, href: '/time-entries' },
+    { name: 'Reports', icon: FileText, href: '/reports' },
+    { name: 'Import Data', icon: Upload, href: '/import' },
+    { name: 'Draft Records', icon: FileCheck, href: '/drafts' },
 ];
 
 interface SidebarProps {
@@ -55,21 +55,20 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                     height={34}
                     className={styles.logoIcon}
                 />
-                {!collapsed && (
-                    <div className={styles.logoText}>
-                        <span className={styles.logoTitle}>TRACKERA</span>
-                        <span className={styles.logoTagline}>TRACK LESS, KNOW MORE</span>
-                    </div>
-                )}
+                <div className={styles.logoText}>
+                    <span className={styles.logoTitle}>TRACKERA</span>
+                    <span className={styles.logoTagline}>TRACK LESS, KNOW MORE</span>
+                </div>
             </div>
 
             <button onClick={onToggle} className={styles.collapseBtn} title={collapsed ? 'Expand' : 'Collapse'}>
-                {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
 
             <nav className={styles.nav}>
                 <div className={styles.menuSection}>
-                    {coreMenuItems.map((item) => {
+                    <div className={styles.sectionLabel}>Main</div>
+                    {mainMenuItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname === item.href;
                         return (
@@ -79,26 +78,27 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                                 className={clsx(styles.link, isActive && styles.active)}
                                 title={collapsed ? item.name : undefined}
                             >
-                                <Icon size={20} />
-                                {!collapsed && <span>{item.name}</span>}
+                                <Icon size={18} />
+                                <span>{item.name}</span>
                             </Link>
                         );
                     })}
                 </div>
 
                 <div className={styles.menuSection}>
-                    {extraMenuItems.map((item) => {
+                    <div className={styles.sectionLabel}>Data</div>
+                    {dataMenuItems.map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname === item.href;
                         return (
                             <Link
                                 key={item.href}
                                 href={item.href}
-                                className={clsx(styles.link, isActive && styles.active, item.grey && styles.grey)}
+                                className={clsx(styles.link, isActive && styles.active, styles.grey)}
                                 title={collapsed ? item.name : undefined}
                             >
-                                <Icon size={20} />
-                                {!collapsed && <span>{item.name}</span>}
+                                <Icon size={18} />
+                                <span>{item.name}</span>
                             </Link>
                         );
                     })}
@@ -107,8 +107,8 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
 
             <div className={styles.footer}>
                 <button onClick={handleLogout} className={styles.logoutBtn} title={collapsed ? 'Logout' : undefined}>
-                    <LogOut size={20} />
-                    {!collapsed && <span>Logout</span>}
+                    <LogOut size={18} />
+                    <span>Logout</span>
                 </button>
             </div>
         </aside>

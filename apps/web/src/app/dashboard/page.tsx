@@ -1,13 +1,22 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import DashboardLayout from '../../components/DashboardLayout';
 import { supabase, getCompanySchema } from '@/lib/supabase';
 import { DateFilterProvider, useDateFilter } from '@/contexts/DateFilterContext';
 import { DateRangePicker } from '@/components/DateRangePicker';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+import { ApexOptions } from 'apexcharts';
 
+// Dynamic import for ApexCharts to avoid SSR issues
+const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
+
+// Modern color palette
+const CHART_COLORS = {
+    primary: ['#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#4f46e5', '#4338ca'],
+    teal: ['#14b8a6', '#2dd4bf', '#5eead4', '#99f6e4'],
+    mixed: ['#6366f1', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'],
+};
 
 type TabType = 'company' | 'project' | 'employee-overview' | 'employee-deep-dive';
 
@@ -36,10 +45,10 @@ export default function Dashboard() {
     }
 
     const tabs = [
-        { id: 'company' as TabType, label: 'Company Overview', icon: '🏢' },
-        { id: 'project' as TabType, label: 'Project View', icon: '📊' },
-        { id: 'employee-overview' as TabType, label: 'Employee Overview', icon: '👥' },
-        { id: 'employee-deep-dive' as TabType, label: 'Employee Deep Dive', icon: '🔍' }
+        { id: 'company' as TabType, label: 'Company Overview' },
+        { id: 'project' as TabType, label: 'Project View' },
+        { id: 'employee-overview' as TabType, label: 'Employee Overview' },
+        { id: 'employee-deep-dive' as TabType, label: 'Employee Deep Dive' }
     ];
 
     if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
@@ -55,36 +64,31 @@ export default function Dashboard() {
                 {/* Date Range Picker */}
                 <DateRangePicker />
 
-                {/* Tab Navigation */}
+                {/* Tab Navigation - Underlined Style */}
                 <div style={{
                     display: 'flex',
-                    gap: '0.5rem',
-                    borderBottom: '2px solid #e2e8f0',
+                    gap: '2rem',
+                    borderBottom: '1px solid #e2e8f0',
                     marginBottom: '2rem',
-                    overflow: 'auto'
                 }}>
                     {tabs.map(tab => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             style={{
-                                padding: '1rem 1.5rem',
+                                padding: '0.75rem 0',
                                 background: 'none',
                                 border: 'none',
-                                borderBottom: activeTab === tab.id ? '3px solid #6366f1' : '3px solid transparent',
+                                borderBottom: activeTab === tab.id ? '2px solid #6366f1' : '2px solid transparent',
                                 color: activeTab === tab.id ? '#6366f1' : '#64748b',
-                                fontWeight: activeTab === tab.id ? '600' : '400',
+                                fontWeight: activeTab === tab.id ? '600' : '500',
                                 cursor: 'pointer',
-                                transition: 'all 0.2s',
-                                fontSize: '0.95rem',
-                                whiteSpace: 'nowrap',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem'
+                                transition: 'all 0.15s ease',
+                                fontSize: '0.875rem',
+                                marginBottom: '-1px',
                             }}
                         >
-                            <span>{tab.icon}</span>
-                            <span>{tab.label}</span>
+                            {tab.label}
                         </button>
                     ))}
                 </div>
@@ -114,6 +118,8 @@ function CompanyOverviewTab() {
     const [openProjects, setOpenProjects] = useState<any[]>([]);
     const [employeeHoursData, setEmployeeHoursData] = useState<any[]>([]);
     const [projectKeys, setProjectKeys] = useState<string[]>([]);
+    const [chartSeries, setChartSeries] = useState<any[]>([]);
+    const [chartCategories, setChartCategories] = useState<string[]>([]);
 
     useEffect(() => {
         if (isDateLoading) return; // Wait for date filter to initialize
@@ -184,22 +190,26 @@ function CompanyOverviewTab() {
                     setOpenProjects(projectsWithRates);
 
                     // Build stacked bar chart data: actual hours per project per employee
-                    if (employees && timeEntries) {
+                    if (employees && timeEntries && projects.length > 0) {
                         const projectNames = projects.map(p => p.name);
                         setProjectKeys(projectNames);
+                        setChartCategories(employees.map(emp => emp.first_name));
 
-                        const chartData = employees.map(emp => {
-                            const empData: any = { name: `${emp.first_name}` };
-                            projects.forEach(proj => {
+                        // Build series for ApexCharts stacked bar
+                        const series = projects.map((proj, idx) => {
+                            const data = employees.map(emp => {
                                 const projEntries = timeEntries?.filter(
                                     (e: any) => e.employee_id === emp.id && e.project_id === proj.id
                                 ) || [];
                                 const totalMinutes = projEntries.reduce((sum: number, e: any) => sum + (e.minutes || 0), 0);
-                                empData[proj.name] = Math.round(totalMinutes / 60); // Convert to hours
+                                return Math.round(totalMinutes / 60);
                             });
-                            return empData;
+                            return {
+                                name: proj.name,
+                                data
+                            };
                         });
-                        setEmployeeHoursData(chartData);
+                        setChartSeries(series);
                     }
 
                     // Calculate capacity (total allocated / total available)
@@ -226,13 +236,73 @@ function CompanyOverviewTab() {
 
     // Color for execution rate
     const getExecutionColor = (rate: number) => {
-        if (rate >= 85) return { bg: '#dcfce7', color: '#166534' }; // Green
-        if (rate >= 65) return { bg: '#fef9c3', color: '#854d0e' }; // Yellow
-        return { bg: '#fee2e2', color: '#991b1b' }; // Red
+        if (rate >= 85) return { bg: '#d1fae5', color: '#065f46' }; // Green
+        if (rate >= 65) return { bg: '#fef3c7', color: '#b45309' }; // Amber
+        return { bg: '#fee2e2', color: '#dc2626' }; // Red
     };
 
-    // Colors for stacked bars
-    const STACK_COLORS = ['#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#3b0764'];
+    // ApexCharts options for stacked bar chart
+    const stackedBarOptions: ApexOptions = {
+        chart: {
+            type: 'bar',
+            stacked: true,
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 800,
+            },
+            toolbar: { show: false },
+            fontFamily: 'inherit',
+        },
+        plotOptions: {
+            bar: {
+                borderRadius: 4,
+                horizontal: false,
+                columnWidth: '55%',
+            },
+        },
+        colors: CHART_COLORS.mixed,
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shade: 'light',
+                type: 'vertical',
+                shadeIntensity: 0.2,
+                opacityFrom: 1,
+                opacityTo: 0.9,
+                stops: [0, 100],
+            },
+        },
+        grid: {
+            borderColor: '#f1f5f9',
+            strokeDashArray: 0,
+            xaxis: { lines: { show: false } },
+            yaxis: { lines: { show: true } },
+        },
+        xaxis: {
+            categories: chartCategories,
+            labels: { style: { colors: '#64748b', fontSize: '12px' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#64748b', fontSize: '12px' },
+                formatter: (val) => `${val}h`
+            },
+        },
+        tooltip: {
+            theme: 'light',
+            y: { formatter: (val) => `${val} hours` },
+        },
+        legend: {
+            position: 'top',
+            horizontalAlign: 'right',
+            fontSize: '12px',
+            markers: { size: 8, shape: 'circle' as const },
+        },
+        dataLabels: { enabled: false },
+    };
 
     if (loading) {
         return (
@@ -274,7 +344,7 @@ function CompanyOverviewTab() {
                                             padding: '0.75rem',
                                             background: '#f8fafc',
                                             borderRadius: '6px',
-                                            borderLeft: `4px solid ${STACK_COLORS[idx % STACK_COLORS.length]}`
+                                            borderLeft: `3px solid ${CHART_COLORS.mixed[idx % CHART_COLORS.mixed.length]}`
                                         }}
                                     >
                                         <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{proj.name}</span>
@@ -300,31 +370,17 @@ function CompanyOverviewTab() {
                 </div>
 
                 {/* Hours per Project per Employee - Stacked Bar Chart */}
-                <div className="card" style={{ height: '400px' }}>
+                <div className="card" style={{ padding: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>Hours per Project per Employee</h3>
-                    {employeeHoursData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="90%">
-                            <BarChart
-                                data={employeeHoursData}
-                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <RechartsTooltip />
-                                <Legend />
-                                {projectKeys.map((key, idx) => (
-                                    <Bar
-                                        key={key}
-                                        dataKey={key}
-                                        stackId="a"
-                                        fill={STACK_COLORS[idx % STACK_COLORS.length]}
-                                    />
-                                ))}
-                            </BarChart>
-                        </ResponsiveContainer>
+                    {chartSeries.length > 0 ? (
+                        <Chart
+                            options={stackedBarOptions}
+                            series={chartSeries}
+                            type="bar"
+                            height={350}
+                        />
                     ) : (
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '350px', color: '#94a3b8' }}>
                             No allocation data available
                         </div>
                     )}
@@ -344,7 +400,9 @@ function ProjectViewTab() {
     const [selectedProjectId, setSelectedProjectId] = useState<string>('');
     const [projectStats, setProjectStats] = useState<any>(null);
     const [workDistribution, setWorkDistribution] = useState<any[]>([]);
+    const [workDistributionLabels, setWorkDistributionLabels] = useState<string[]>([]);
     const [monthlyProgress, setMonthlyProgress] = useState<any[]>([]);
+    const [monthlyCategories, setMonthlyCategories] = useState<string[]>([]);
 
     useEffect(() => {
         loadProjects();
@@ -418,11 +476,10 @@ function ProjectViewTab() {
                     distMap.set(name, current + (entry.minutes / 60)); // Convert to hours
                 });
 
-                const distData = Array.from(distMap.entries()).map(([name, value]) => ({
-                    name,
-                    value: Math.round(value * 10) / 10 // Round to 1 decimal
-                }));
-                setWorkDistribution(distData);
+                const labels = Array.from(distMap.keys());
+                const values = Array.from(distMap.values()).map(v => Math.round((v as number) * 10) / 10);
+                setWorkDistributionLabels(labels);
+                setWorkDistribution(values);
             }
 
             // 3. Get monthly progress (planned vs actual) by grouping time entries by month
@@ -450,23 +507,142 @@ function ProjectViewTab() {
             });
 
             // Build progress data
-            const progressData = Array.from(monthlyMap.entries()).map(([monthKey, actual]) => {
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const categories: string[] = [];
+            const plannedData: number[] = [];
+            const actualData: number[] = [];
+
+            Array.from(monthlyMap.entries()).forEach(([monthKey, actual]) => {
                 const [year, month] = monthKey.split('-').map(Number);
                 const planned = allocations?.find((a: any) => a.year === year && a.month === month)?.allocated_hours || 0;
-                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                return {
-                    name: monthNames[month - 1],
-                    planned,
-                    actual: Math.round(actual)
-                };
+                categories.push(monthNames[month - 1]);
+                plannedData.push(planned);
+                actualData.push(Math.round(actual as number));
             });
-            setMonthlyProgress(progressData);
+
+            setMonthlyCategories(categories);
+            setMonthlyProgress([
+                { name: 'Planned Hours', data: plannedData },
+                { name: 'Actual Hours', data: actualData }
+            ]);
 
         } catch (err) {
             console.error('Error loading project details:', err);
         } finally {
             setLoading(false);
         }
+    };
+
+    // Donut chart options
+    const donutOptions: ApexOptions = {
+        chart: {
+            type: 'donut',
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 800,
+            },
+        },
+        colors: CHART_COLORS.primary,
+        plotOptions: {
+            pie: {
+                donut: {
+                    size: '65%',
+                    labels: {
+                        show: true,
+                        total: {
+                            show: true,
+                            label: 'Total Hours',
+                            color: '#64748b',
+                            fontSize: '14px',
+                            formatter: (w) => {
+                                const total = w.globals.seriesTotals.reduce((a: number, b: number) => a + b, 0);
+                                return `${Math.round(total)}`;
+                            }
+                        },
+                        value: {
+                            fontSize: '24px',
+                            fontWeight: '600',
+                            color: '#0f172a',
+                        },
+                    },
+                },
+            },
+        },
+        stroke: { show: false },
+        legend: {
+            position: 'bottom',
+            fontSize: '12px',
+            markers: { size: 8, shape: 'circle' as const },
+        },
+        labels: workDistributionLabels,
+        dataLabels: { enabled: false },
+        tooltip: {
+            y: { formatter: (val) => `${val} hours` }
+        },
+    };
+
+    // Grouped bar chart options
+    const groupedBarOptions: ApexOptions = {
+        chart: {
+            type: 'bar',
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 800,
+            },
+            toolbar: { show: false },
+            fontFamily: 'inherit',
+        },
+        plotOptions: {
+            bar: {
+                borderRadius: 6,
+                horizontal: false,
+                columnWidth: '50%',
+                dataLabels: { position: 'top' },
+            },
+        },
+        colors: ['#14b8a6', '#6366f1'],
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shade: 'light',
+                type: 'vertical',
+                shadeIntensity: 0.2,
+                opacityFrom: 1,
+                opacityTo: 0.85,
+                stops: [0, 100],
+            },
+        },
+        grid: {
+            borderColor: '#f1f5f9',
+            strokeDashArray: 0,
+            xaxis: { lines: { show: false } },
+            yaxis: { lines: { show: true } },
+        },
+        xaxis: {
+            categories: monthlyCategories,
+            labels: { style: { colors: '#64748b', fontSize: '12px' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#64748b', fontSize: '12px' },
+                formatter: (val) => `${val}h`
+            },
+        },
+        tooltip: {
+            theme: 'light',
+            y: { formatter: (val) => `${val} hours` },
+        },
+        legend: {
+            position: 'top',
+            horizontalAlign: 'right',
+            fontSize: '12px',
+            markers: { size: 8, shape: 'circle' as const },
+        },
+        dataLabels: { enabled: false },
     };
 
     return (
@@ -513,53 +689,38 @@ function ProjectViewTab() {
                     {/* Visual Slots */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
 
-                        {/* Chart 1: Work Distribution */}
-                        <div className="card" style={{ height: '400px' }}>
-                            <h3 style={{ marginBottom: '1rem' }}>Work Distribution (Planned Hours)</h3>
+                        {/* Chart 1: Work Distribution - Donut */}
+                        <div className="card" style={{ padding: '1.5rem' }}>
+                            <h3 style={{ marginBottom: '1rem' }}>Work Distribution (Actual Hours)</h3>
                             {workDistribution.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={workDistribution}
-                                            cx="50%"
-                                            cy="50%"
-                                            labelLine={false}
-                                            label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                                            outerRadius={120}
-                                            fill="#8884d8"
-                                            dataKey="value"
-                                        >
-                                            {workDistribution.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <RechartsTooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
+                                <Chart
+                                    options={donutOptions}
+                                    series={workDistribution}
+                                    type="donut"
+                                    height={350}
+                                />
                             ) : (
-                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '350px', color: '#94a3b8' }}>
                                     No team allocations found
                                 </div>
                             )}
                         </div>
 
                         {/* Chart 2: Planned vs Actual */}
-                        <div className="card" style={{ height: '400px' }}>
-                            <h3 style={{ marginBottom: '1rem' }}>Planned vs Actual (Last 6 Months)</h3>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart
-                                    data={monthlyProgress}
-                                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="name" />
-                                    <YAxis />
-                                    <RechartsTooltip />
-                                    <Legend />
-                                    <Bar dataKey="planned" fill="#8884d8" name="Planned Hours" />
-                                    <Bar dataKey="actual" fill="#82ca9d" name="Actual Hours" />
-                                </BarChart>
-                            </ResponsiveContainer>
+                        <div className="card" style={{ padding: '1.5rem' }}>
+                            <h3 style={{ marginBottom: '1rem' }}>Planned vs Actual (Monthly)</h3>
+                            {monthlyProgress.length > 0 ? (
+                                <Chart
+                                    options={groupedBarOptions}
+                                    series={monthlyProgress}
+                                    type="bar"
+                                    height={350}
+                                />
+                            ) : (
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '350px', color: '#94a3b8' }}>
+                                    No monthly data available
+                                </div>
+                            )}
                         </div>
                     </div>
                 </>
@@ -579,6 +740,8 @@ function EmployeeOverviewTab() {
     const { dateFilter, isLoading: isDateLoading } = useDateFilter();
     const [employees, setEmployees] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [chartCategories, setChartCategories] = useState<string[]>([]);
+    const [chartData, setChartData] = useState<number[]>([]);
 
     useEffect(() => {
         if (isDateLoading) return;
@@ -623,12 +786,78 @@ function EmployeeOverviewTab() {
                 });
 
                 setEmployees(enhancedEmployees);
+                setChartCategories(enhancedEmployees.map(e => e.first_name));
+                setChartData(enhancedEmployees.map(e => e.monthlyPlanned));
             }
         } catch (err) {
             console.error('Error loading employees:', err);
         } finally {
             setLoading(false);
         }
+    };
+
+    // Horizontal bar chart options
+    const horizontalBarOptions: ApexOptions = {
+        chart: {
+            type: 'bar',
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 800,
+            },
+            toolbar: { show: false },
+            fontFamily: 'inherit',
+        },
+        plotOptions: {
+            bar: {
+                borderRadius: 6,
+                horizontal: true,
+                barHeight: '60%',
+                distributed: true,
+                dataLabels: { position: 'top' },
+            },
+        },
+        colors: CHART_COLORS.primary,
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shade: 'light',
+                type: 'horizontal',
+                shadeIntensity: 0.2,
+                opacityFrom: 0.9,
+                opacityTo: 1,
+                stops: [0, 100],
+            },
+        },
+        grid: {
+            borderColor: '#f1f5f9',
+            strokeDashArray: 0,
+            xaxis: { lines: { show: true } },
+            yaxis: { lines: { show: false } },
+        },
+        xaxis: {
+            categories: chartCategories,
+            labels: {
+                style: { colors: '#64748b', fontSize: '12px' },
+                formatter: (val) => `${val}h`
+            },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+        },
+        yaxis: {
+            labels: { style: { colors: '#64748b', fontSize: '12px' } },
+        },
+        tooltip: {
+            theme: 'light',
+            y: { formatter: (val) => `${val} hours` },
+        },
+        legend: { show: false },
+        dataLabels: {
+            enabled: true,
+            formatter: (val) => `${val}h`,
+            style: { fontSize: '12px', colors: ['#64748b'] },
+            offsetX: 30,
+        },
     };
 
     return (
@@ -672,26 +901,17 @@ function EmployeeOverviewTab() {
             </div>
 
             <div style={{ marginTop: '2rem' }}>
-                <div className="card" style={{ height: '400px' }}>
+                <div className="card" style={{ padding: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>Hours Distribution per Employee</h3>
-                    {employees.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                                data={employees}
-                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="first_name" />
-                                <YAxis />
-                                <RechartsTooltip
-                                    formatter={(value: any) => [`${value} hrs`, 'Planned Hours']}
-                                />
-                                <Legend />
-                                <Bar dataKey="monthlyPlanned" fill="#8884d8" name="Planned Load" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    {chartData.length > 0 ? (
+                        <Chart
+                            options={horizontalBarOptions}
+                            series={[{ name: 'Hours', data: chartData }]}
+                            type="bar"
+                            height={Math.max(300, chartCategories.length * 50)}
+                        />
                     ) : (
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', color: '#94a3b8' }}>
                             No data available
                         </div>
                     )}
@@ -710,7 +930,8 @@ function EmployeeDeepDiveTab() {
     const [employees, setEmployees] = useState<any[]>([]);
     const [selectedEmpId, setSelectedEmpId] = useState<string>('');
     const [empStats, setEmpStats] = useState<any>(null);
-    const [workloadData, setWorkloadData] = useState<any[]>([]);
+    const [workloadData, setWorkloadData] = useState<number[]>([]);
+    const [workloadCategories, setWorkloadCategories] = useState<string[]>([]);
 
     useEffect(() => {
         loadEmployees();
@@ -724,6 +945,7 @@ function EmployeeDeepDiveTab() {
         } else {
             setEmpStats(null);
             setWorkloadData([]);
+            setWorkloadCategories([]);
         }
     }, [selectedEmpId, dateFilter.startDate, dateFilter.endDate, isDateLoading]);
 
@@ -801,10 +1023,9 @@ function EmployeeDeepDiveTab() {
                         projectMap.set(projectName, current + (entry.minutes / 60));
                     });
 
-                    const data = Array.from(projectMap.entries()).map(([name, hours]) => ({
-                        name,
-                        hours: Math.round(hours as number)
-                    }));
+                    const categories = Array.from(projectMap.keys());
+                    const data = Array.from(projectMap.values()).map(h => Math.round(h as number));
+                    setWorkloadCategories(categories);
                     setWorkloadData(data);
                 }
             }
@@ -813,6 +1034,69 @@ function EmployeeDeepDiveTab() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Bar chart options for workload
+    const workloadBarOptions: ApexOptions = {
+        chart: {
+            type: 'bar',
+            animations: {
+                enabled: true,
+                easing: 'easeinout',
+                speed: 800,
+            },
+            toolbar: { show: false },
+            fontFamily: 'inherit',
+        },
+        plotOptions: {
+            bar: {
+                borderRadius: 8,
+                horizontal: false,
+                columnWidth: '55%',
+                distributed: true,
+            },
+        },
+        colors: CHART_COLORS.mixed,
+        fill: {
+            type: 'gradient',
+            gradient: {
+                shade: 'dark',
+                type: 'vertical',
+                shadeIntensity: 0.3,
+                opacityFrom: 1,
+                opacityTo: 0.8,
+                stops: [0, 100],
+            },
+        },
+        grid: {
+            borderColor: '#f1f5f9',
+            strokeDashArray: 0,
+            xaxis: { lines: { show: false } },
+            yaxis: { lines: { show: true } },
+        },
+        xaxis: {
+            categories: workloadCategories,
+            labels: { style: { colors: '#64748b', fontSize: '12px' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+        },
+        yaxis: {
+            labels: {
+                style: { colors: '#64748b', fontSize: '12px' },
+                formatter: (val) => `${val}h`
+            },
+        },
+        tooltip: {
+            theme: 'light',
+            y: { formatter: (val) => `${val} hours` },
+        },
+        legend: { show: false },
+        dataLabels: {
+            enabled: true,
+            formatter: (val) => `${val}h`,
+            style: { fontSize: '12px', fontWeight: '600', colors: ['#fff'] },
+            offsetY: -20,
+        },
     };
 
     return (
@@ -865,23 +1149,17 @@ function EmployeeDeepDiveTab() {
 
                     {/* Visual Slots */}
                     <div style={{ display: 'grid', gap: '1.5rem' }}>
-                        <div className="card" style={{ height: '400px' }}>
+                        <div className="card" style={{ padding: '1.5rem' }}>
                             <h3 style={{ marginBottom: '1rem' }}>Workload Distribution (Hours per Project)</h3>
                             {workloadData.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={workloadData}
-                                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <XAxis dataKey="name" />
-                                        <YAxis />
-                                        <RechartsTooltip />
-                                        <Bar dataKey="hours" fill="#8884d8" name="Hours" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                </ResponsiveContainer>
+                                <Chart
+                                    options={workloadBarOptions}
+                                    series={[{ name: 'Hours', data: workloadData }]}
+                                    type="bar"
+                                    height={350}
+                                />
                             ) : (
-                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: '#94a3b8' }}>
+                                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '350px', color: '#94a3b8' }}>
                                     No workload allocation data found
                                 </div>
                             )}
@@ -902,20 +1180,31 @@ function EmployeeDeepDiveTab() {
 // ============================================
 function MetricCard({ title, value }: { title: string; value: string }) {
     return (
-        <div className="card" style={{ textAlign: 'center' }}>
-            <h3 style={{ fontSize: '0.875rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+        <div style={{
+            background: 'white',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            padding: '20px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        }}>
+            <div style={{
+                fontSize: '11px',
+                fontWeight: 500,
+                color: '#64748b',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                marginBottom: '8px'
+            }}>
                 {title}
-            </h3>
-            <p style={{
-                fontSize: '2rem',
-                fontWeight: '700',
-                color: '#1e293b',
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
+            </div>
+            <div style={{
+                fontSize: '28px',
+                fontWeight: 600,
+                color: '#0f172a',
+                lineHeight: 1.2
             }}>
                 {value}
-            </p>
+            </div>
         </div>
     );
 }

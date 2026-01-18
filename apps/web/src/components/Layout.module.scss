@@ -3,25 +3,24 @@
 .layout {
     display: flex;
     min-height: 100vh;
-    background: $slate-50;
+    background: $bg-body;
 }
 
 .mainWrapper {
+    margin-left: 240px;
     flex: 1;
     display: flex;
     flex-direction: column;
-    margin-left: 250px; // Sidebar width
-    transition: margin-left 0.2s ease;
+    min-height: 100vh;
+    transition: margin-left $transition-smooth;
 
     &.sidebarCollapsed {
-        margin-left: 70px; // Collapsed sidebar width
+        margin-left: 64px;
     }
 }
 
 .mainContent {
     flex: 1;
-    padding: $spacing-8;
-    max-width: 1600px;
-    width: 100%;
-    margin: 0 auto;
+    padding: $spacing-6;
+    background: $bg-body;
 }
