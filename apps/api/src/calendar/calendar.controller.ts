@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Res, UseGuards, Request, BadRequestException, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Query, Res, UseGuards, Request, BadRequestException, Param } from '@nestjs/common';
 import { CalendarService } from './calendar.service';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { AuthGuard } from '@nestjs/passport';
@@ -23,6 +23,12 @@ export class CalendarController {
         if (!connectionId) throw new BadRequestException('Connection ID is required');
         await this.calendarService.enqueueSync(connectionId);
         return { message: 'Sync initiated' };
+    }
+
+    @Delete('connections/:connectionId')
+    @UseGuards(TenantGuard, AuthGuard('jwt'))
+    async disconnect(@Request() req: any, @Param('connectionId') connectionId: string) {
+        return this.calendarService.disconnect(connectionId, TenantContext.getTenantId()!, req.user.id);
     }
 
     @Get('connect/google')

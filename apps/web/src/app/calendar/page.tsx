@@ -270,6 +270,26 @@ function CalendarContent() {
         }
     };
 
+    const handleDisconnect = async (connectionId: string) => {
+        if (!confirm('Are you sure you want to disconnect this calendar? All synced events will be removed.')) return;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const token = session.access_token;
+        const tenantId = session.user.user_metadata?.company_id;
+
+        try {
+            await axios.delete(`http://localhost:3000/calendar/connections/${connectionId}`, {
+                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
+            });
+            alert('Calendar disconnected successfully');
+            fetchData();
+        } catch (err) {
+            console.error(err);
+            alert('Failed to disconnect');
+        }
+    };
+
     const goToPrevWeek = () => {
         const newStart = new Date(currentWeekStart);
         newStart.setDate(newStart.getDate() - 7);
@@ -536,15 +556,25 @@ function CalendarContent() {
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {connections.length > 0 && (
-                        <button
-                            onClick={() => handleSync(connections[0].id)}
-                            disabled={syncing[connections[0]?.id]}
-                            className="btn btn-primary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                        >
-                            <RefreshCw size={16} className={syncing[connections[0]?.id] ? 'animate-spin' : ''} />
-                            Sync Calendar
-                        </button>
+                        <>
+                            <button
+                                onClick={() => handleDisconnect(connections[0].id)}
+                                className="btn"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fee2e2', color: '#ef4444', border: '1px solid #fecaca' }}
+                            >
+                                <X size={16} />
+                                Disconnect
+                            </button>
+                            <button
+                                onClick={() => handleSync(connections[0].id)}
+                                disabled={syncing[connections[0]?.id]}
+                                className="btn btn-primary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                            >
+                                <RefreshCw size={16} className={syncing[connections[0]?.id] ? 'animate-spin' : ''} />
+                                Sync Calendar
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
