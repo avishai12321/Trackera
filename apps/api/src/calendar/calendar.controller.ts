@@ -37,6 +37,12 @@ export class CalendarController {
         return { message: 'Sync initiated' };
     }
 
+    @Delete('connections/:connectionId')
+    @UseGuards(TenantGuard, AuthGuard('jwt'))
+    async disconnect(@Request() req: any, @Param('connectionId') connectionId: string) {
+        return this.calendarService.disconnect(connectionId, TenantContext.getTenantId()!, req.user.id);
+    }
+
     @Get('connect/google')
     @UseGuards(TenantGuard, AuthGuard('jwt'))
     async connectGoogle(@Request() req: any) {

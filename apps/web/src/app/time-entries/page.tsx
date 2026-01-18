@@ -5,10 +5,26 @@ import DashboardLayout from '../../components/DashboardLayout';
 import { Plus, Trash2 } from 'lucide-react';
 import { supabase, getCompanySchema, getCurrentUser, insertCompanyTable, deleteCompanyTable } from '@/lib/supabase';
 
+interface TimeEntry {
+    id: string;
+    description: string | null;
+    date: string;
+    start_time: string;
+    minutes: number;
+    billable: boolean;
+    project_id: string;
+    employee_id: string;
+}
+
+interface Project {
+    id: string;
+    name: string;
+}
+
 export default function TimeEntries() {
     const router = useRouter();
-    const [entries, setEntries] = useState([]);
-    const [projects, setProjects] = useState([]);
+    const [entries, setEntries] = useState<TimeEntry[]>([]);
+    const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [employeeId, setEmployeeId] = useState<string | null>(null);
     const [tenantId, setTenantId] = useState<string | null>(null);
@@ -199,7 +215,7 @@ export default function TimeEntries() {
                             {entries.map((e: any) => (
                                 <tr key={e.id}>
                                     <td>{new Date(e.start_time).toLocaleDateString()}</td>
-                                    <td style={{ fontWeight: 500, color: '#4f46e5' }}>{projects.find((p: any) => p.id === e.project_id)?.name || 'Unknown'}</td>
+                                    <td style={{ fontWeight: 500, color: '#4338ca' }}>{projects.find((p: Project) => p.id === e.project_id)?.name || 'Unknown'}</td>
                                     <td>{e.description || '-'}</td>
                                     <td>{e.minutes}m</td>
                                     <td>

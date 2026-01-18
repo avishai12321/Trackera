@@ -16,14 +16,15 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
     "@time-tracker/dto": "*",
+    "apexcharts": "^5.3.6",
     "axios": "^1.13.2",
     "caniuse-lite": "^1.0.30001762",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",
     "react": "19.2.3",
+    "react-apexcharts": "^1.9.0",
     "react-dom": "19.2.3",
-    "recharts": "^3.6.0",
     "sass": "^1.97.1"
   },
   "devDependencies": {

@@ -12,25 +12,25 @@ import {
 // Google Calendar icon component
 const GoogleCalendarIcon = ({ size = 12 }: { size?: number }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M18.316 5.684H5.684v12.632h12.632V5.684z" fill="#fff"/>
-        <path d="M18.316 24L24 18.316V5.684L18.316 0H5.684L0 5.684v12.632L5.684 24h12.632z" fill="#4285F4"/>
-        <path d="M18.316 18.316H24V5.684h-5.684v12.632z" fill="#EA4335"/>
-        <path d="M5.684 18.316H0V24h5.684v-5.684z" fill="#34A853"/>
-        <path d="M5.684 5.684V0H0v5.684h5.684z" fill="#188038"/>
-        <path d="M5.684 18.316v5.684h12.632v-5.684H5.684z" fill="#FBBC04"/>
-        <path d="M18.316 0v5.684H24V0h-5.684z" fill="#1967D2"/>
-        <path d="M8.842 15.158V8.842h1.263v2.526l2.527-2.526h1.579l-2.527 2.526 2.843 3.79h-1.579l-2.211-2.948-.632.632v2.316H8.842z" fill="#4285F4"/>
+        <path d="M18.316 5.684H5.684v12.632h12.632V5.684z" fill="#fff" />
+        <path d="M18.316 24L24 18.316V5.684L18.316 0H5.684L0 5.684v12.632L5.684 24h12.632z" fill="#4285F4" />
+        <path d="M18.316 18.316H24V5.684h-5.684v12.632z" fill="#EA4335" />
+        <path d="M5.684 18.316H0V24h5.684v-5.684z" fill="#34A853" />
+        <path d="M5.684 5.684V0H0v5.684h5.684z" fill="#188038" />
+        <path d="M5.684 18.316v5.684h12.632v-5.684H5.684z" fill="#FBBC04" />
+        <path d="M18.316 0v5.684H24V0h-5.684z" fill="#1967D2" />
+        <path d="M8.842 15.158V8.842h1.263v2.526l2.527-2.526h1.579l-2.527 2.526 2.843 3.79h-1.579l-2.211-2.948-.632.632v2.316H8.842z" fill="#4285F4" />
     </svg>
 );
 
 // Microsoft Outlook icon component
 const OutlookIcon = ({ size = 12 }: { size?: number }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M24 7.387v10.478c0 .574-.467 1.04-1.04 1.04h-8.96v-12h8.96c.573 0 1.04.466 1.04 1.04v-.558z" fill="#0364B8"/>
-        <path d="M24 7.387l-6 4.174-4-2.782V6.905h8.96c.573 0 1.04.466 1.04 1.04v-.558z" fill="#0A2767"/>
-        <path d="M14 8.779l4 2.782 6-4.174v9.478c0 .574-.467 1.04-1.04 1.04H14V8.779z" fill="#28A8EA"/>
-        <path d="M14 6.905V18.91l-1.5 1.5L0 18.405V5.595l12.5 2.004L14 6.905z" fill="#0078D4"/>
-        <path d="M9.5 9.5c-1.657 0-3 1.567-3 3.5s1.343 3.5 3 3.5 3-1.567 3-3.5-1.343-3.5-3-3.5zm0 5.5c-.828 0-1.5-.895-1.5-2s.672-2 1.5-2 1.5.895 1.5 2-.672 2-1.5 2z" fill="#fff"/>
+        <path d="M24 7.387v10.478c0 .574-.467 1.04-1.04 1.04h-8.96v-12h8.96c.573 0 1.04.466 1.04 1.04v-.558z" fill="#0364B8" />
+        <path d="M24 7.387l-6 4.174-4-2.782V6.905h8.96c.573 0 1.04.466 1.04 1.04v-.558z" fill="#0A2767" />
+        <path d="M14 8.779l4 2.782 6-4.174v9.478c0 .574-.467 1.04-1.04 1.04H14V8.779z" fill="#28A8EA" />
+        <path d="M14 6.905V18.91l-1.5 1.5L0 18.405V5.595l12.5 2.004L14 6.905z" fill="#0078D4" />
+        <path d="M9.5 9.5c-1.657 0-3 1.567-3 3.5s1.343 3.5 3 3.5 3-1.567 3-3.5-1.343-3.5-3-3.5zm0 5.5c-.828 0-1.5-.895-1.5-2s.672-2 1.5-2 1.5.895 1.5 2-.672 2-1.5 2z" fill="#fff" />
     </svg>
 );
 
@@ -706,6 +706,7 @@ function CalendarContent() {
                     {connections.length > 0 && (
                         <>
                             <button
+
                                 onClick={() => handleSync(connections[0].id)}
                                 disabled={syncing[connections[0]?.id]}
                                 className="btn btn-primary"

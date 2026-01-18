@@ -1,19 +1,33 @@
 @use 'variables' as *;
 
+// ============================================
+// TRACKERA GLOBAL STYLES - "Slate Professional"
+// Clean, minimal, enterprise-grade
+// Build: Jan 18, 2026 - v2.0
+// ============================================
+
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
 }
 
-body {
-    font-family: 'Inter', sans-serif; // Will configure in layout.tsx
-    background-color: $bg-body;
-    color: $slate-800;
-    min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
+html {
+    scroll-behavior: smooth;
 }
 
+body {
+    font-family: $font-family;
+    font-size: $text-sm;
+    line-height: 1.5;
+    background-color: $bg-body;
+    color: $slate-700;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+// Typography
 h1,
 h2,
 h3,
@@ -21,14 +35,35 @@ h4,
 h5,
 h6 {
     color: $slate-900;
-    font-weight: 600;
-    line-height: 1.25;
+    font-weight: $font-semibold;
+    line-height: 1.3;
+}
+
+h1 {
+    font-size: $text-xl;
+}
+
+h2 {
+    font-size: $text-lg;
+}
+
+h3 {
+    font-size: $text-base;
+    font-weight: $font-medium;
+}
+
+p {
+    color: $slate-600;
 }
 
 a {
     text-decoration: none;
-    color: inherit;
-    transition: $transition-base;
+    color: $primary-600;
+    transition: $transition-fast;
+
+    &:hover {
+        color: $primary-700;
+    }
 }
 
 button {
@@ -37,29 +72,98 @@ button {
     font-family: inherit;
 }
 
-ul {
+ul,
+ol {
     list-style: none;
 }
 
-// Utility Classes
-.container {
-    max-width: 1200px; // Standard container
-    margin: 0 auto;
-    padding: 0 $spacing-6;
+// Scrollbar
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
 }
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: $slate-300;
+    border-radius: $radius-full;
+
+    &:hover {
+        background: $slate-400;
+    }
+}
+
+// ============================================
+// CARDS - Clean, minimal
+// ============================================
 
 .card {
     background: $bg-surface;
     border-radius: $radius-lg;
     border: 1px solid $slate-200;
-    box-shadow: $shadow-sm;
-    padding: $spacing-6;
-    transition: $transition-base;
+    padding: $spacing-5;
 
-    &:hover {
-        box-shadow: $shadow-md;
+    &--flat {
+        border: none;
+        box-shadow: $shadow-sm;
     }
 }
+
+// ============================================
+// METRIC CARDS - Like reference designs
+// ============================================
+
+.metric-card {
+    background: $bg-surface;
+    border: 1px solid $slate-200;
+    border-radius: $radius-lg;
+    padding: $spacing-5;
+
+    &__label {
+        font-size: $text-xs;
+        font-weight: $font-medium;
+        color: $slate-500;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-bottom: $spacing-1;
+    }
+
+    &__value {
+        font-size: $text-2xl;
+        font-weight: $font-semibold;
+        color: $slate-900;
+        line-height: 1.2;
+    }
+
+    &__change {
+        display: inline-flex;
+        align-items: center;
+        gap: $spacing-1;
+        font-size: $text-xs;
+        font-weight: $font-medium;
+        margin-top: $spacing-2;
+
+        &--positive {
+            color: $success-600;
+        }
+
+        &--negative {
+            color: $danger-600;
+        }
+    }
+
+    &__chart {
+        height: 40px;
+        margin-top: $spacing-3;
+    }
+}
+
+// ============================================
+// BUTTONS
+// ============================================
 
 .btn {
     display: inline-flex;
@@ -67,44 +171,67 @@ ul {
     justify-content: center;
     padding: $spacing-2 $spacing-4;
     border-radius: $radius-md;
-    font-weight: 500;
-    transition: $transition-base;
-    font-size: 0.875rem;
+    font-weight: $font-medium;
+    font-size: $text-sm;
     gap: $spacing-2;
+    transition: $transition-fast;
+    border: none;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 
     &-primary {
-        background: $gradient-primary;
+        background: $primary-600;
         color: white;
-        box-shadow: $shadow-sm;
 
-        &:hover {
-            box-shadow: $shadow-glow;
-            transform: translateY(-1px);
+        &:hover:not(:disabled) {
+            background: $primary-700;
         }
     }
 
     &-secondary {
-        background: white;
+        background: $bg-surface;
         border: 1px solid $slate-200;
         color: $slate-700;
 
-        &:hover {
+        &:hover:not(:disabled) {
             background: $slate-50;
             border-color: $slate-300;
         }
     }
 
     &-danger {
-        background: #fee2e2;
-        color: $danger;
+        background: $bg-surface;
+        border: 1px solid $danger-200;
+        color: $danger-600;
 
-        &:hover {
-            background: #fecaca;
+        &:hover:not(:disabled) {
+            background: $danger-50;
         }
+    }
+
+    &-ghost {
+        background: transparent;
+        color: $slate-600;
+
+        &:hover:not(:disabled) {
+            background: $slate-100;
+        }
+    }
+
+    &-sm {
+        padding: $spacing-1 $spacing-3;
+        font-size: $text-xs;
     }
 }
 
-// Table Styles
+// ============================================
+// TABLES - Clean, minimal borders
+// ============================================
+
 .table-container {
     overflow-x: auto;
     border-radius: $radius-lg;
@@ -119,26 +246,125 @@ table {
     th {
         background: $slate-50;
         color: $slate-500;
-        font-weight: 600;
+        font-weight: $font-medium;
+        font-size: $text-xs;
         text-transform: uppercase;
-        font-size: 0.75rem;
-        padding: $spacing-3 $spacing-6;
+        letter-spacing: 0.03em;
+        padding: $spacing-3 $spacing-4;
         text-align: left;
+        border-bottom: 1px solid $slate-200;
     }
 
     td {
-        padding: $spacing-4 $spacing-6;
-        border-top: 1px solid $slate-100;
+        padding: $spacing-4;
         color: $slate-700;
-        font-size: 0.875rem;
+        font-size: $text-sm;
+        border-bottom: 1px solid $slate-100;
     }
 
-    tr:hover td {
+    tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    tbody tr:hover td {
         background: $slate-50;
     }
 }
 
-// Inputs
+// ============================================
+// TABS - Underlined style
+// ============================================
+
+.tabs {
+    display: flex;
+    gap: $spacing-6;
+    border-bottom: 1px solid $slate-200;
+    margin-bottom: $spacing-6;
+
+    &__tab {
+        padding: $spacing-3 0;
+        font-size: $text-sm;
+        font-weight: $font-medium;
+        color: $slate-500;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        cursor: pointer;
+        transition: $transition-fast;
+
+        &:hover {
+            color: $slate-700;
+        }
+
+        &--active {
+            color: $primary-600;
+            border-bottom-color: $primary-600;
+        }
+    }
+
+    &__count {
+        margin-left: $spacing-2;
+        padding: 2px 6px;
+        background: $slate-100;
+        border-radius: $radius-full;
+        font-size: $text-xs;
+        color: $slate-600;
+    }
+}
+
+// ============================================
+// BADGES - Outline style
+// ============================================
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px $spacing-2;
+    border-radius: $radius-full;
+    font-size: $text-xs;
+    font-weight: $font-medium;
+
+    &--success {
+        background: $success-50;
+        color: $success-700;
+        border: 1px solid $success-200;
+    }
+
+    &--danger {
+        background: $danger-50;
+        color: $danger-700;
+        border: 1px solid $danger-200;
+    }
+
+    &--warning {
+        background: $warning-50;
+        color: $warning-600;
+        border: 1px solid $warning-200;
+    }
+
+    &--info {
+        background: $info-50;
+        color: $info-600;
+        border: 1px solid $info-200;
+    }
+
+    &--neutral {
+        background: $slate-100;
+        color: $slate-600;
+    }
+
+    &--primary {
+        background: $primary-50;
+        color: $primary-700;
+        border: 1px solid $primary-200;
+    }
+}
+
+// ============================================
+// FORM INPUTS
+// ============================================
+
 input,
 select,
 textarea {
@@ -147,13 +373,210 @@ textarea {
     border: 1px solid $slate-200;
     border-radius: $radius-md;
     background: white;
-    font-size: 0.875rem;
+    font-size: $text-sm;
     color: $slate-800;
-    transition: $transition-base;
+    transition: $transition-fast;
+
+    &::placeholder {
+        color: $slate-400;
+    }
+
+    &:hover:not(:disabled) {
+        border-color: $slate-300;
+    }
 
     &:focus {
         outline: none;
         border-color: $primary-500;
-        box-shadow: 0 0 0 2px $primary-100;
+        box-shadow: 0 0 0 3px $primary-100;
+    }
+
+    &:disabled {
+        background: $slate-50;
+        color: $slate-400;
+        cursor: not-allowed;
+    }
+}
+
+select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right $spacing-3 center;
+    padding-right: $spacing-10;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+    width: 16px;
+    height: 16px;
+    accent-color: $primary-600;
+    cursor: pointer;
+}
+
+label {
+    font-size: $text-sm;
+    font-weight: $font-medium;
+    color: $slate-700;
+    display: block;
+    margin-bottom: $spacing-1;
+}
+
+// ============================================
+// PROGRESS BAR
+// ============================================
+
+.progress {
+    height: 8px;
+    background: $slate-100;
+    border-radius: $radius-full;
+    overflow: hidden;
+
+    &__bar {
+        height: 100%;
+        background: linear-gradient(90deg, $primary-500, $primary-400);
+        border-radius: $radius-full;
+        transition: width 0.3s ease;
+    }
+
+    &--success .progress__bar {
+        background: linear-gradient(90deg, $success-500, $success-400);
+    }
+}
+
+// ============================================
+// AVATAR
+// ============================================
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: $radius-full;
+    background: $primary-100;
+    color: $primary-600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: $text-xs;
+    font-weight: $font-semibold;
+
+    &--sm {
+        width: 24px;
+        height: 24px;
+        font-size: 10px;
+    }
+
+    &--lg {
+        width: 40px;
+        height: 40px;
+        font-size: $text-sm;
+    }
+}
+
+// ============================================
+// MODAL
+// ============================================
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba($slate-900, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: $z-modal-backdrop;
+    padding: $spacing-4;
+}
+
+.modal {
+    background: white;
+    border-radius: $radius-xl;
+    box-shadow: $shadow-lg;
+    max-width: 560px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+
+    &__header {
+        padding: $spacing-5;
+        border-bottom: 1px solid $slate-100;
+        @include flex-between;
+    }
+
+    &__body {
+        padding: $spacing-5;
+    }
+
+    &__footer {
+        padding: $spacing-4 $spacing-5;
+        border-top: 1px solid $slate-100;
+        display: flex;
+        justify-content: flex-end;
+        gap: $spacing-3;
+    }
+}
+
+// ============================================
+// EMPTY STATE
+// ============================================
+
+.empty-state {
+    text-align: center;
+    padding: $spacing-12 $spacing-6;
+    color: $slate-400;
+
+    &__icon {
+        margin-bottom: $spacing-4;
+        color: $slate-300;
+    }
+
+    &__title {
+        font-size: $text-base;
+        font-weight: $font-medium;
+        color: $slate-600;
+        margin-bottom: $spacing-2;
+    }
+
+    &__description {
+        font-size: $text-sm;
+        color: $slate-500;
+    }
+}
+
+// ============================================
+// PAGE LAYOUT UTILITIES
+// ============================================
+
+.page-header {
+    @include flex-between;
+    margin-bottom: $spacing-6;
+
+    &__title {
+        h1 {
+            margin-bottom: $spacing-1;
+        }
+
+        p {
+            font-size: $text-sm;
+            color: $slate-500;
+        }
+    }
+}
+
+.grid {
+    display: grid;
+    gap: $spacing-4;
+
+    &--2 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    &--3 {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    &--4 {
+        grid-template-columns: repeat(4, 1fr);
     }
 }

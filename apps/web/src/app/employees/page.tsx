@@ -263,13 +263,13 @@ export default function Employees() {
                                                         <input
                                                             type="text"
                                                             value={editData.first_name || ''}
-                                                            onChange={e => setEditData({...editData, first_name: e.target.value})}
+                                                            onChange={e => setEditData({ ...editData, first_name: e.target.value })}
                                                             style={{ width: '70px', padding: '0.25rem' }}
                                                         />
                                                         <input
                                                             type="text"
                                                             value={editData.last_name || ''}
-                                                            onChange={e => setEditData({...editData, last_name: e.target.value})}
+                                                            onChange={e => setEditData({ ...editData, last_name: e.target.value })}
                                                             style={{ width: '70px', padding: '0.25rem' }}
                                                         />
                                                     </div>
@@ -278,7 +278,7 @@ export default function Employees() {
                                                     <input
                                                         type="text"
                                                         value={editData.position || ''}
-                                                        onChange={e => setEditData({...editData, position: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, position: e.target.value })}
                                                         style={{ width: '100px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -286,14 +286,14 @@ export default function Employees() {
                                                     <input
                                                         type="text"
                                                         value={editData.department || ''}
-                                                        onChange={e => setEditData({...editData, department: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, department: e.target.value })}
                                                         style={{ width: '100px', padding: '0.25rem' }}
                                                     />
                                                 </td>
                                                 <td>
                                                     <select
                                                         value={editData.level || ''}
-                                                        onChange={e => setEditData({...editData, level: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, level: e.target.value })}
                                                         style={{ width: '80px', padding: '0.25rem' }}
                                                     >
                                                         <option value="">-</option>
@@ -307,7 +307,7 @@ export default function Employees() {
                                                 <td>
                                                     <select
                                                         value={editData.manager_id || ''}
-                                                        onChange={e => setEditData({...editData, manager_id: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, manager_id: e.target.value })}
                                                         style={{ width: '100px', padding: '0.25rem' }}
                                                     >
                                                         <option value="">-</option>
@@ -322,7 +322,7 @@ export default function Employees() {
                                                     <input
                                                         type="email"
                                                         value={editData.email || ''}
-                                                        onChange={e => setEditData({...editData, email: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, email: e.target.value })}
                                                         style={{ width: '140px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -330,7 +330,7 @@ export default function Employees() {
                                                     <input
                                                         type="number"
                                                         value={editData.monthly_capacity || ''}
-                                                        onChange={e => setEditData({...editData, monthly_capacity: e.target.value ? parseFloat(e.target.value) : null})}
+                                                        onChange={e => setEditData({ ...editData, monthly_capacity: e.target.value ? parseFloat(e.target.value) : null })}
                                                         style={{ width: '60px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -338,14 +338,14 @@ export default function Employees() {
                                                     <input
                                                         type="date"
                                                         value={editData.hire_date || ''}
-                                                        onChange={e => setEditData({...editData, hire_date: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, hire_date: e.target.value })}
                                                         style={{ width: '120px', padding: '0.25rem' }}
                                                     />
                                                 </td>
                                                 <td>
                                                     <select
                                                         value={editData.status || 'ACTIVE'}
-                                                        onChange={e => setEditData({...editData, status: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, status: e.target.value })}
                                                         style={{ width: '80px', padding: '0.25rem' }}
                                                     >
                                                         <option value="ACTIVE">ACTIVE</option>
@@ -357,7 +357,7 @@ export default function Employees() {
                                             <>
                                                 <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
                                                     <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                                        <button onClick={() => startEdit(employee)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#3b82f6', color: 'white' }}>
+                                                        <button onClick={() => startEdit(employee)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#6366f1', color: 'white' }}>
                                                             <Edit2 size={14} />
                                                         </button>
                                                         <button onClick={() => handleDelete(employee.id)} className="btn btn-danger" style={{ padding: '0.25rem 0.5rem' }}>
@@ -386,8 +386,8 @@ export default function Employees() {
                                                         padding: '2px 8px',
                                                         borderRadius: '999px',
                                                         fontSize: '0.75rem',
-                                                        background: employee.status === 'ACTIVE' ? '#dbeafe' : '#fee2e2',
-                                                        color: employee.status === 'ACTIVE' ? '#1e40af' : '#991b1b'
+                                                        background: employee.status === 'ACTIVE' ? '#eef2ff' : '#fee2e2',
+                                                        color: employee.status === 'ACTIVE' ? '#4338ca' : '#dc2626'
                                                     }}>
                                                         {employee.status}
                                                     </span>
@@ -443,19 +443,19 @@ export default function Employees() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>First Name *</label>
-                                        <input type="text" placeholder="John" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} required />
+                                        <input type="text" placeholder="John" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} required />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Last Name *</label>
-                                        <input type="text" placeholder="Doe" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} required />
+                                        <input type="text" placeholder="Doe" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} required />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Email</label>
-                                        <input type="email" placeholder="john.doe@example.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                        <input type="email" placeholder="john.doe@example.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Employee Code</label>
-                                        <input type="text" placeholder="EMP-001" value={formData.employeeCode} onChange={e => setFormData({...formData, employeeCode: e.target.value})} />
+                                        <input type="text" placeholder="EMP-001" value={formData.employeeCode} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -466,15 +466,15 @@ export default function Employees() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Position</label>
-                                        <input type="text" placeholder="Software Engineer" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})} />
+                                        <input type="text" placeholder="Software Engineer" value={formData.position} onChange={e => setFormData({ ...formData, position: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Department</label>
-                                        <input type="text" placeholder="Engineering" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} />
+                                        <input type="text" placeholder="Engineering" value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Level</label>
-                                        <select value={formData.level} onChange={e => setFormData({...formData, level: e.target.value})}>
+                                        <select value={formData.level} onChange={e => setFormData({ ...formData, level: e.target.value })}>
                                             <option value="">Select Level</option>
                                             <option value="Junior">Junior</option>
                                             <option value="Mid">Mid</option>
@@ -485,7 +485,7 @@ export default function Employees() {
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Manager</label>
-                                        <select value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})}>
+                                        <select value={formData.managerId} onChange={e => setFormData({ ...formData, managerId: e.target.value })}>
                                             <option value="">No Manager</option>
                                             {employees.map((emp) => (
                                                 <option key={emp.id} value={emp.id}>
@@ -503,15 +503,15 @@ export default function Employees() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Salary</label>
-                                        <input type="number" step="0.01" placeholder="75000.00" value={formData.salary} onChange={e => setFormData({...formData, salary: e.target.value})} />
+                                        <input type="number" step="0.01" placeholder="75000.00" value={formData.salary} onChange={e => setFormData({ ...formData, salary: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hourly Rate</label>
-                                        <input type="number" step="0.01" placeholder="50.00" value={formData.hourlyRate} onChange={e => setFormData({...formData, hourlyRate: e.target.value})} />
+                                        <input type="number" step="0.01" placeholder="50.00" value={formData.hourlyRate} onChange={e => setFormData({ ...formData, hourlyRate: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
-                                        <select value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
+                                        <select value={formData.currency} onChange={e => setFormData({ ...formData, currency: e.target.value })}>
                                             <option value="USD">USD</option>
                                             <option value="EUR">EUR</option>
                                             <option value="GBP">GBP</option>
@@ -520,7 +520,7 @@ export default function Employees() {
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Monthly Capacity (hours)</label>
-                                        <input type="number" step="0.01" placeholder="160" value={formData.monthlyCapacity} onChange={e => setFormData({...formData, monthlyCapacity: e.target.value})} />
+                                        <input type="number" step="0.01" placeholder="160" value={formData.monthlyCapacity} onChange={e => setFormData({ ...formData, monthlyCapacity: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -531,11 +531,11 @@ export default function Employees() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Years of Experience</label>
-                                        <input type="number" step="0.1" placeholder="5.5" value={formData.yearsOfExperience} onChange={e => setFormData({...formData, yearsOfExperience: e.target.value})} />
+                                        <input type="number" step="0.1" placeholder="5.5" value={formData.yearsOfExperience} onChange={e => setFormData({ ...formData, yearsOfExperience: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hire Date</label>
-                                        <input type="date" value={formData.hireDate} onChange={e => setFormData({...formData, hireDate: e.target.value})} />
+                                        <input type="date" value={formData.hireDate} onChange={e => setFormData({ ...formData, hireDate: e.target.value })} />
                                     </div>
                                 </div>
                             </div>

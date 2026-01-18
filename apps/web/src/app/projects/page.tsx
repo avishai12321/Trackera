@@ -300,7 +300,7 @@ export default function Projects() {
                                                     <input
                                                         type="text"
                                                         value={editData.name || ''}
-                                                        onChange={e => setEditData({...editData, name: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, name: e.target.value })}
                                                         style={{ width: '120px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -308,14 +308,14 @@ export default function Projects() {
                                                     <input
                                                         type="text"
                                                         value={editData.code || ''}
-                                                        onChange={e => setEditData({...editData, code: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, code: e.target.value })}
                                                         style={{ width: '60px', padding: '0.25rem' }}
                                                     />
                                                 </td>
                                                 <td>
                                                     <select
                                                         value={editData.client_id || ''}
-                                                        onChange={e => setEditData({...editData, client_id: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, client_id: e.target.value })}
                                                         style={{ width: '100px', padding: '0.25rem' }}
                                                     >
                                                         <option value="">-</option>
@@ -327,7 +327,7 @@ export default function Projects() {
                                                 <td>
                                                     <select
                                                         value={editData.manager_id || ''}
-                                                        onChange={e => setEditData({...editData, manager_id: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, manager_id: e.target.value })}
                                                         style={{ width: '100px', padding: '0.25rem' }}
                                                     >
                                                         <option value="">-</option>
@@ -341,7 +341,7 @@ export default function Projects() {
                                                 <td>
                                                     <select
                                                         value={editData.budget_type || 'FIXED'}
-                                                        onChange={e => setEditData({...editData, budget_type: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, budget_type: e.target.value })}
                                                         style={{ width: '80px', padding: '0.25rem' }}
                                                     >
                                                         <option value="FIXED">Fixed</option>
@@ -358,9 +358,9 @@ export default function Projects() {
                                                             onChange={e => {
                                                                 const val = e.target.value ? parseFloat(e.target.value) : null;
                                                                 if (editData.budget_type === 'HOURLY_RATE') {
-                                                                    setEditData({...editData, hourly_rate: val});
+                                                                    setEditData({ ...editData, hourly_rate: val });
                                                                 } else {
-                                                                    setEditData({...editData, total_budget: val});
+                                                                    setEditData({ ...editData, total_budget: val });
                                                                 }
                                                             }}
                                                             style={{ width: '80px', padding: '0.25rem' }}
@@ -371,7 +371,7 @@ export default function Projects() {
                                                     <input
                                                         type="date"
                                                         value={editData.start_date || ''}
-                                                        onChange={e => setEditData({...editData, start_date: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, start_date: e.target.value })}
                                                         style={{ width: '120px', padding: '0.25rem' }}
                                                     />
                                                 </td>
@@ -379,14 +379,14 @@ export default function Projects() {
                                                     <input
                                                         type="date"
                                                         value={editData.end_date || ''}
-                                                        onChange={e => setEditData({...editData, end_date: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, end_date: e.target.value })}
                                                         style={{ width: '120px', padding: '0.25rem' }}
                                                     />
                                                 </td>
                                                 <td>
                                                     <select
                                                         value={editData.status || 'ACTIVE'}
-                                                        onChange={e => setEditData({...editData, status: e.target.value})}
+                                                        onChange={e => setEditData({ ...editData, status: e.target.value })}
                                                         style={{ width: '80px', padding: '0.25rem' }}
                                                     >
                                                         <option value="ACTIVE">ACTIVE</option>
@@ -398,7 +398,7 @@ export default function Projects() {
                                             <>
                                                 <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
                                                     <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                                        <button onClick={() => startEdit(project)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#3b82f6', color: 'white' }}>
+                                                        <button onClick={() => startEdit(project)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#6366f1', color: 'white' }}>
                                                             <Edit2 size={14} />
                                                         </button>
                                                         <button onClick={() => handleDelete(project.id)} className="btn btn-danger" style={{ padding: '0.25rem 0.5rem' }}>
@@ -425,8 +425,8 @@ export default function Projects() {
                                                         padding: '2px 8px',
                                                         borderRadius: '4px',
                                                         fontSize: '0.75rem',
-                                                        background: project.budget_type === 'FIXED' ? '#e0e7ff' : (project.budget_type === 'MONTHLY_RATE' ? '#d1fae5' : '#fef3c7'),
-                                                        color: project.budget_type === 'FIXED' ? '#3730a3' : (project.budget_type === 'MONTHLY_RATE' ? '#065f46' : '#92400e')
+                                                        background: project.budget_type === 'FIXED' ? '#eef2ff' : (project.budget_type === 'MONTHLY_RATE' ? '#f0fdf4' : '#fef3c7'),
+                                                        color: project.budget_type === 'FIXED' ? '#4338ca' : (project.budget_type === 'MONTHLY_RATE' ? '#15803d' : '#b45309')
                                                     }}>
                                                         {project.budget_type === 'FIXED' ? 'Fixed' : (project.budget_type === 'MONTHLY_RATE' ? 'Monthly' : 'Hourly')}
                                                     </span>
@@ -451,8 +451,8 @@ export default function Projects() {
                                                         padding: '2px 8px',
                                                         borderRadius: '999px',
                                                         fontSize: '0.75rem',
-                                                        background: project.status === 'ACTIVE' ? '#dbeafe' : '#f3f4f6',
-                                                        color: project.status === 'ACTIVE' ? '#1e40af' : '#4b5563'
+                                                        background: project.status === 'ACTIVE' ? '#eef2ff' : '#f3f4f6',
+                                                        color: project.status === 'ACTIVE' ? '#4338ca' : '#4b5563'
                                                     }}>
                                                         {project.status}
                                                     </span>
@@ -508,15 +508,15 @@ export default function Projects() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Name *</label>
-                                        <input type="text" placeholder="Project Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
+                                        <input type="text" placeholder="Project Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Code</label>
-                                        <input type="text" placeholder="PRJ-001" value={formData.code} onChange={e => setFormData({...formData, code: e.target.value})} />
+                                        <input type="text" placeholder="PRJ-001" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
                                     </div>
                                     <div style={{ gridColumn: '1 / -1' }}>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Description</label>
-                                        <input type="text" placeholder="Project description..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                                        <input type="text" placeholder="Project description..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
@@ -527,7 +527,7 @@ export default function Projects() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Client</label>
-                                        <select value={formData.clientId} onChange={e => setFormData({...formData, clientId: e.target.value})}>
+                                        <select value={formData.clientId} onChange={e => setFormData({ ...formData, clientId: e.target.value })}>
                                             <option value="">No Client</option>
                                             {clients.map((client) => (
                                                 <option key={client.id} value={client.id}>{client.name}</option>
@@ -536,7 +536,7 @@ export default function Projects() {
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Project Manager</label>
-                                        <select value={formData.managerId} onChange={e => setFormData({...formData, managerId: e.target.value})}>
+                                        <select value={formData.managerId} onChange={e => setFormData({ ...formData, managerId: e.target.value })}>
                                             <option value="">No Manager</option>
                                             {employees.map((emp) => (
                                                 <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
@@ -553,15 +553,15 @@ export default function Projects() {
                                     <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Budget Type</label>
                                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                            <input type="radio" value="FIXED" checked={formData.budgetType === 'FIXED'} onChange={e => setFormData({...formData, budgetType: e.target.value})} />
+                                            <input type="radio" value="FIXED" checked={formData.budgetType === 'FIXED'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
                                             <span>Fixed Budget</span>
                                         </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                            <input type="radio" value="HOURLY_RATE" checked={formData.budgetType === 'HOURLY_RATE'} onChange={e => setFormData({...formData, budgetType: e.target.value})} />
+                                            <input type="radio" value="HOURLY_RATE" checked={formData.budgetType === 'HOURLY_RATE'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
                                             <span>Hourly Rate</span>
                                         </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                            <input type="radio" value="MONTHLY_RATE" checked={formData.budgetType === 'MONTHLY_RATE'} onChange={e => setFormData({...formData, budgetType: e.target.value})} />
+                                            <input type="radio" value="MONTHLY_RATE" checked={formData.budgetType === 'MONTHLY_RATE'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
                                             <span>Monthly Rate</span>
                                         </label>
                                     </div>
@@ -571,11 +571,11 @@ export default function Projects() {
                                     <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                         <div>
                                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Total Budget</label>
-                                            <input type="number" step="0.01" placeholder="50000.00" value={formData.totalBudget} onChange={e => setFormData({...formData, totalBudget: e.target.value})} />
+                                            <input type="number" step="0.01" placeholder="50000.00" value={formData.totalBudget} onChange={e => setFormData({ ...formData, totalBudget: e.target.value })} />
                                         </div>
                                         <div>
                                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
-                                            <select value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
+                                            <select value={formData.currency} onChange={e => setFormData({ ...formData, currency: e.target.value })}>
                                                 <option value="USD">USD</option>
                                                 <option value="EUR">EUR</option>
                                                 <option value="GBP">GBP</option>
@@ -589,15 +589,15 @@ export default function Projects() {
                                     <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                         <div>
                                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hourly Rate</label>
-                                            <input type="number" step="0.01" placeholder="150.00" value={formData.hourlyRate} onChange={e => setFormData({...formData, hourlyRate: e.target.value})} />
+                                            <input type="number" step="0.01" placeholder="150.00" value={formData.hourlyRate} onChange={e => setFormData({ ...formData, hourlyRate: e.target.value })} />
                                         </div>
                                         <div>
                                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Estimated Hours</label>
-                                            <input type="number" step="0.01" placeholder="500" value={formData.estimatedHours} onChange={e => setFormData({...formData, estimatedHours: e.target.value})} />
+                                            <input type="number" step="0.01" placeholder="500" value={formData.estimatedHours} onChange={e => setFormData({ ...formData, estimatedHours: e.target.value })} />
                                         </div>
                                         <div>
                                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
-                                            <select value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
+                                            <select value={formData.currency} onChange={e => setFormData({ ...formData, currency: e.target.value })}>
                                                 <option value="USD">USD</option>
                                                 <option value="EUR">EUR</option>
                                                 <option value="GBP">GBP</option>
@@ -611,11 +611,11 @@ export default function Projects() {
                                     <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                         <div>
                                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Monthly Rate</label>
-                                            <input type="number" step="0.01" placeholder="5000.00" value={formData.monthlyRate} onChange={e => setFormData({...formData, monthlyRate: e.target.value})} />
+                                            <input type="number" step="0.01" placeholder="5000.00" value={formData.monthlyRate} onChange={e => setFormData({ ...formData, monthlyRate: e.target.value })} />
                                         </div>
                                         <div>
                                             <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
-                                            <select value={formData.currency} onChange={e => setFormData({...formData, currency: e.target.value})}>
+                                            <select value={formData.currency} onChange={e => setFormData({ ...formData, currency: e.target.value })}>
                                                 <option value="USD">USD</option>
                                                 <option value="EUR">EUR</option>
                                                 <option value="GBP">GBP</option>
@@ -632,11 +632,11 @@ export default function Projects() {
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Start Date</label>
-                                        <input type="date" value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} />
+                                        <input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>End Date</label>
-                                        <input type="date" value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} />
+                                        <input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
                                     </div>
                                 </div>
                             </div>
