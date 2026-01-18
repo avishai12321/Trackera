@@ -7,7 +7,7 @@ export class ProjectsService {
     constructor(private supabase: SupabaseService) { }
 
     async create(createProjectDto: CreateProjectDto, tenantId: string) {
-        const { data, error } = await this.supabase.getAdminClient()
+        const { data, error } = await this.supabase.getClientForTenant(tenantId)
             .from('projects')
             .insert({
                 tenant_id: tenantId,
@@ -24,7 +24,7 @@ export class ProjectsService {
     }
 
     async findAll(tenantId: string) {
-        const { data, error } = await this.supabase.getAdminClient()
+        const { data, error } = await this.supabase.getClientForTenant(tenantId)
             .from('projects')
             .select('*')
             .eq('tenant_id', tenantId);
@@ -33,8 +33,8 @@ export class ProjectsService {
         return data || [];
     }
 
-    async findOne(id: string) {
-        const { data, error } = await this.supabase.getAdminClient()
+    async findOne(id: string, tenantId: string) {
+        const { data, error } = await this.supabase.getClientForTenant(tenantId)
             .from('projects')
             .select('*')
             .eq('id', id)
@@ -46,8 +46,8 @@ export class ProjectsService {
         return data;
     }
 
-    async update(id: string, updateProjectDto: UpdateProjectDto) {
-        const { data, error } = await this.supabase.getAdminClient()
+    async update(id: string, updateProjectDto: UpdateProjectDto, tenantId: string) {
+        const { data, error } = await this.supabase.getClientForTenant(tenantId)
             .from('projects')
             .update({
                 name: updateProjectDto.name,
@@ -63,8 +63,8 @@ export class ProjectsService {
         return data;
     }
 
-    async remove(id: string) {
-        const { error } = await this.supabase.getAdminClient()
+    async remove(id: string, tenantId: string) {
+        const { error } = await this.supabase.getClientForTenant(tenantId)
             .from('projects')
             .delete()
             .eq('id', id);

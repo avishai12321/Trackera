@@ -74,6 +74,7 @@
 }
 
 .profile {
+    position: relative;
     display: flex;
     align-items: center;
     gap: $spacing-3;
@@ -91,4 +92,45 @@
     align-items: center;
     justify-content: center;
     box-shadow: $shadow-sm;
+    border: none;
+    cursor: pointer;
+    transition: $transition-base;
+
+    &:hover {
+        transform: scale(1.05);
+        box-shadow: $shadow-md;
+    }
+}
+
+.dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 160px;
+    background: white;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-lg;
+    border: 1px solid $slate-200;
+    padding: $spacing-2;
+    z-index: 50;
+}
+
+.dropdownItem {
+    display: flex;
+    align-items: center;
+    gap: $spacing-3;
+    width: 100%;
+    padding: $spacing-3 $spacing-4;
+    border: none;
+    background: transparent;
+    color: $slate-700;
+    font-size: 0.875rem;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: $transition-base;
+
+    &:hover {
+        background: $slate-50;
+        color: $danger;
+    }
 }

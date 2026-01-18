@@ -6,7 +6,7 @@ import { supabase, getCompanySchema } from '@/lib/supabase';
 import DashboardLayout from '../../components/DashboardLayout';
 import {
     Plus, Loader, ChevronLeft, ChevronRight,
-    Settings, X, Clock, RefreshCw, Users, MapPin, Video
+    Settings, X, Clock, RefreshCw, Users, MapPin, Video, Unlink
 } from 'lucide-react';
 
 // Google Calendar icon component
@@ -314,17 +314,25 @@ function CalendarContent() {
 
     const handleConnect = async (provider: 'google' | 'microsoft') => {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+        if (!session) {
+            console.error('No session found');
+            alert('Please log in first');
+            return;
+        }
         const token = session.access_token;
         const tenantId = session.user.user_metadata?.company_id;
+
+        console.log('Connecting calendar:', { provider, tenantId, hasToken: !!token });
 
         try {
             const res = await axios.get(`http://localhost:3000/calendar/connect/${provider}`, {
                 headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
             });
+            console.log('Connect response:', res.data);
             window.location.href = res.data.url;
-        } catch (err) {
-            alert('Failed to initiate connection');
+        } catch (err: any) {
+            console.error('Calendar connect error:', err.response?.data || err.message || err);
+            alert(`Failed to initiate connection: ${err.response?.data?.message || err.message || 'Unknown error'}`);
         }
     };
 
@@ -347,6 +355,27 @@ function CalendarContent() {
             console.error(err);
             alert('Failed to sync');
             setSyncing(prev => ({ ...prev, [connectionId]: false }));
+        }
+    };
+
+    const handleDisconnect = async (connectionId: string) => {
+        const confirmed = window.confirm('Are you sure you want to disconnect this calendar? This will remove all synced events.');
+        if (!confirmed) return;
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const token = session.access_token;
+        const tenantId = session.user.user_metadata?.company_id;
+
+        try {
+            await axios.delete(`http://localhost:3000/calendar/connections/${connectionId}`, {
+                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
+            });
+            alert('Calendar disconnected successfully');
+            fetchData();
+        } catch (err) {
+            console.error(err);
+            alert('Failed to disconnect calendar');
         }
     };
 
@@ -554,7 +583,6 @@ function CalendarContent() {
                         endTime,
                         durationMinutes,
                         billable: true,
-                        confirmed: false,
                         calendarEventId: event.source === 'google' ? event.id : undefined // Link to calendar event
                     }, {
                         headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
@@ -564,9 +592,11 @@ function CalendarContent() {
             setSelectedSlots(new Set());
             setShowProjectModal(false);
             await fetchData(); // Wait for refresh to show updated colors
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to assign project:', err);
-            alert('Failed to assign project');
+            console.error('Response data:', err.response?.data);
+            console.error('Response status:', err.response?.status);
+            alert(`Failed to assign project: ${err.response?.data?.message || err.message}`);
         }
     };
 
@@ -632,16 +662,18 @@ function CalendarContent() {
                 startTime: startTime.toISOString(),
                 endTime: endTime.toISOString(),
                 durationMinutes,
-                billable: true,
-                confirmed: false
+                billable: true
             }, {
                 headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
             });
             setShowAddSlotModal(false);
             setAddSlotData(null);
             fetchData();
-        } catch (err) {
-            alert('Failed to add time slot');
+        } catch (err: any) {
+            console.error('Failed to add time slot:', err);
+            console.error('Response data:', err.response?.data);
+            console.error('Response status:', err.response?.status);
+            alert(`Failed to add time slot: ${err.response?.data?.message || err.message}`);
         }
     };
 
@@ -672,15 +704,26 @@ function CalendarContent() {
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {connections.length > 0 && (
-                        <button
-                            onClick={() => handleSync(connections[0].id)}
-                            disabled={syncing[connections[0]?.id]}
-                            className="btn btn-primary"
-                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                        >
-                            <RefreshCw size={16} className={syncing[connections[0]?.id] ? 'animate-spin' : ''} />
-                            Sync Calendar
-                        </button>
+                        <>
+                            <button
+                                onClick={() => handleSync(connections[0].id)}
+                                disabled={syncing[connections[0]?.id]}
+                                className="btn btn-primary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                            >
+                                <RefreshCw size={16} className={syncing[connections[0]?.id] ? 'animate-spin' : ''} />
+                                Sync Calendar
+                            </button>
+                            <button
+                                onClick={() => handleDisconnect(connections[0].id)}
+                                className="btn"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626' }}
+                                title="Disconnect calendar to troubleshoot or switch accounts"
+                            >
+                                <Unlink size={16} />
+                                Disconnect
+                            </button>
+                        </>
                     )}
                 </div>
             </div>
@@ -1217,7 +1260,7 @@ function CalendarContent() {
                                 endTime,
                                 durationMinutes,
                                 billable: true,
-                                confirmed: false
+                                calendarEventId: selectedEventDetails.source === 'google' ? selectedEventDetails.id : undefined
                             }, {
                                 headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantId }
                             });
@@ -1226,8 +1269,11 @@ function CalendarContent() {
                             setSelectedEventDetails(null);
                             setSelectedSlots(new Set());
                             fetchData();
-                        } catch (err) {
-                            alert('Failed to assign project');
+                        } catch (err: any) {
+                            console.error('Failed to assign project:', err);
+                            console.error('Response data:', err.response?.data);
+                            console.error('Response status:', err.response?.status);
+                            alert(`Failed to assign project: ${err.response?.data?.message || err.message}`);
                         }
                     }}
                 />

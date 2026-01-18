@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, BadRequestException, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, BadRequestException, Request, Logger } from '@nestjs/common';
 import { TimeEntriesService } from './time-entries.service';
 import { CreateTimeEntryDto, UpdateTimeEntryDto, DateRangeQueryDto } from '@time-tracker/dto';
 import { TenantGuard } from '../common/guards/tenant.guard';
@@ -10,11 +10,15 @@ import { Role } from '../shared/enums';
 @Controller('time-entries')
 @UseGuards(TenantGuard, AuthGuard('jwt'), RolesGuard)
 export class TimeEntriesController {
+    private readonly logger = new Logger(TimeEntriesController.name);
     constructor(private readonly timeEntriesService: TimeEntriesService) { }
 
     @Post()
     create(@Body() createTimeEntryDto: CreateTimeEntryDto, @Request() req: any) {
         const tenantId = TenantContext.getTenantId();
+        this.logger.log(`POST /time-entries - tenantId from context: ${tenantId}`);
+        this.logger.log(`x-tenant-id header: ${req.headers['x-tenant-id']}`);
+        this.logger.log(`User: ${JSON.stringify({ id: req.user?.id, tenantId: req.user?.tenantId })}`);
         if (!tenantId) throw new Error('Tenant context missing');
 
         const user = req.user;
@@ -59,16 +63,22 @@ export class TimeEntriesController {
 
     @Get(':id')
     findOne(@Param('id') id: string) {
-        return this.timeEntriesService.findOne(id);
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new Error('Tenant context missing');
+        return this.timeEntriesService.findOne(id, tenantId);
     }
 
     @Patch(':id')
     update(@Param('id') id: string, @Body() updateTimeEntryDto: UpdateTimeEntryDto, @Request() req: any) {
-        return this.timeEntriesService.update(id, updateTimeEntryDto, req.user.id);
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new Error('Tenant context missing');
+        return this.timeEntriesService.update(id, updateTimeEntryDto, req.user.id, tenantId);
     }
 
     @Delete(':id')
     remove(@Param('id') id: string) {
-        return this.timeEntriesService.remove(id);
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new Error('Tenant context missing');
+        return this.timeEntriesService.remove(id, tenantId);
     }
 }
