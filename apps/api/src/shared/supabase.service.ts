@@ -43,4 +43,27 @@ export class SupabaseService {
             },
         );
     }
+
+    // Derive schema name from tenant ID
+    getSchemaNameForTenant(tenantId: string): string {
+        return `company_${tenantId}`;
+    }
+
+    // Get a client configured for a specific tenant's schema
+    // This ensures queries go to the correct tenant schema instead of public
+    getClientForTenant(tenantId: string): SupabaseClient<any, any, any> {
+        const schemaName = this.getSchemaNameForTenant(tenantId);
+        this.logger.log(`Creating client for tenant schema: ${schemaName}`);
+        return createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                db: { schema: schemaName },
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false,
+                },
+            },
+        );
+    }
 }
