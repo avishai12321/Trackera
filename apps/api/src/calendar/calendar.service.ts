@@ -31,13 +31,49 @@ export class CalendarService {
     /**
      * Trigger calendar sync - now runs synchronously (no queue)
      */
-    async enqueueSync(connectionId: string) {
+    async enqueueSync(connectionId: string, tenantId: string) {
         // Run sync directly instead of queuing
-        await this.syncEvents(connectionId);
+        await this.syncEvents(connectionId, tenantId);
+    }
+
+    /**
+     * Find connection and enqueue sync - used by webhooks that only have connectionId
+     * Searches across tenant schemas to find the connection
+     */
+    async enqueueSyncByConnectionId(connectionId: string) {
+        // First, find which tenant this connection belongs to by checking the public tenants table
+        // and looking up the connection in each tenant's schema
+        const { data: tenants, error: tenantsError } = await this.supabase.getAdminClient()
+            .from('tenants')
+            .select('id, schema_name')
+            .not('schema_name', 'is', null);
+
+        if (tenantsError || !tenants?.length) {
+            this.logger.error('Failed to fetch tenants for webhook lookup', tenantsError);
+            return;
+        }
+
+        // Search for the connection in each tenant schema
+        for (const tenant of tenants) {
+            const tenantClient = this.supabase.getClientForTenant(tenant.id);
+            const { data: connection } = await tenantClient
+                .from('calendar_connections')
+                .select('id, tenant_id')
+                .eq('id', connectionId)
+                .maybeSingle();
+
+            if (connection) {
+                this.logger.log(`Found connection ${connectionId} in tenant ${tenant.id}`);
+                await this.syncEvents(connectionId, tenant.id);
+                return;
+            }
+        }
+
+        this.logger.warn(`Connection ${connectionId} not found in any tenant schema`);
     }
 
     async getConnections(tenantId: string, userId: string) {
-        const { data, error } = await this.supabase.getAdminClient()
+        const { data, error } = await this.supabase.getClientForTenant(tenantId)
             .from('calendar_connections')
             .select('id, provider, provider_account_id, status, last_sync_at, created_at')
             .eq('tenant_id', tenantId)
@@ -52,10 +88,44 @@ export class CalendarService {
         return data || [];
     }
 
-    async syncEvents(connectionId: string) {
-        this.logger.log(`Syncing events for connection ${connectionId}`);
+    async disconnectCalendar(tenantId: string, userId: string, connectionId: string) {
+        this.logger.log(`Disconnecting calendar connection ${connectionId} for user ${userId}`);
 
-        const { data: connectionRaw, error } = await this.supabase.getAdminClient()
+        const tenantClient = this.supabase.getClientForTenant(tenantId);
+
+        // Delete associated calendar events first
+        const { error: eventsError } = await tenantClient
+            .from('calendar_events')
+            .delete()
+            .eq('connection_id', connectionId)
+            .eq('tenant_id', tenantId);
+
+        if (eventsError) {
+            this.logger.error('Error deleting calendar events', eventsError);
+        }
+
+        // Delete the connection
+        const { error } = await tenantClient
+            .from('calendar_connections')
+            .delete()
+            .eq('id', connectionId)
+            .eq('tenant_id', tenantId)
+            .eq('user_id', userId);
+
+        if (error) {
+            this.logger.error('Error disconnecting calendar', error);
+            throw error;
+        }
+
+        this.logger.log('Calendar disconnected successfully');
+    }
+
+    async syncEvents(connectionId: string, tenantId: string) {
+        this.logger.log(`Syncing events for connection ${connectionId} in tenant ${tenantId}`);
+
+        const tenantClient = this.supabase.getClientForTenant(tenantId);
+
+        const { data: connectionRaw, error } = await tenantClient
             .from('calendar_connections')
             .select('*')
             .eq('id', connectionId)
@@ -67,20 +137,20 @@ export class CalendarService {
         }
 
         if (connectionRaw.provider === CalendarProvider.GOOGLE) {
-            return this.syncGoogleEvents(connectionRaw);
+            return this.syncGoogleEvents(connectionRaw, tenantClient);
         } else if (connectionRaw.provider === CalendarProvider.MICROSOFT) {
-            return this.syncMicrosoftEvents(connectionRaw);
+            return this.syncMicrosoftEvents(connectionRaw, tenantClient);
         }
 
         return { status: 'skipped', reason: 'unknown_provider' };
     }
 
-    private async syncMicrosoftEvents(connectionRaw: any) {
+    private async syncMicrosoftEvents(connectionRaw: any, tenantClient: any) {
         this.logger.log('Syncing Microsoft events (not implemented yet)');
         return { status: 'skipped' };
     }
 
-    private async syncGoogleEvents(connectionRaw: any) {
+    private async syncGoogleEvents(connectionRaw: any, tenantClient: any) {
         const { id: connectionId, tenant_id: tenantId, access_token_encrypted: accessTokenEncrypted, refresh_token_encrypted: refreshTokenEncrypted, sync_cursor: syncCursor } = connectionRaw;
 
         // 2. Setup Google Client
@@ -98,7 +168,7 @@ export class CalendarService {
         // Listen for token updates (refresh)
         client.on('tokens', async (tokens) => {
             this.logger.log('Tokens refreshed');
-            await this.supabase.getAdminClient()
+            await tenantClient
                 .from('calendar_connections')
                 .update({
                     access_token_encrypted: tokens.access_token,
@@ -142,7 +212,7 @@ export class CalendarService {
                     if (event.status === 'cancelled') {
                         // Handle deletion
                         if (event.id) {
-                            await this.supabase.getAdminClient()
+                            await tenantClient
                                 .from('calendar_events')
                                 .delete()
                                 .match({
@@ -184,7 +254,7 @@ export class CalendarService {
                         // Upsert Logic: Supabase upsert works if we have a unique constraint
                         // Unique constraint on: [tenant_id, connection_id, provider, provider_event_id]
                         // Make sure tenant_id IS included in the insert payload
-                        await this.supabase.getAdminClient()
+                        await tenantClient
                             .from('calendar_events')
                             .upsert({
                                 tenant_id: tenantId,
@@ -214,7 +284,7 @@ export class CalendarService {
 
             // 5. Update cursor
             if (nextSyncToken) {
-                await this.supabase.getAdminClient()
+                await tenantClient
                     .from('calendar_connections')
                     .update({
                         sync_cursor: nextSyncToken,
@@ -226,13 +296,13 @@ export class CalendarService {
         } catch (error: any) {
             if (error.code === 410) {
                 this.logger.warn('Sync token invalid, clearing cursor to resync');
-                await this.supabase.getAdminClient()
+                await tenantClient
                     .from('calendar_connections')
                     .update({ sync_cursor: null })
                     .eq('id', connectionId);
 
                 // Retry sync directly instead of re-queuing
-                await this.syncEvents(connectionId);
+                await this.syncEvents(connectionId, tenantId);
             } else {
                 this.logger.error('Error syncing events', error);
                 throw error;
@@ -289,8 +359,11 @@ export class CalendarService {
             if (!googleUserId) throw new BadRequestException('Could not retrieve Google User ID');
             this.logger.log(`Google User ID: ${googleUserId}`);
 
+            // Use tenant-specific schema client
+            const tenantClient = this.supabase.getClientForTenant(tenantId);
+
             // Ensure employee exists for this user
-            const { data: employee, error: empError } = await this.supabase.getAdminClient()
+            const { data: employee, error: empError } = await tenantClient
                 .from('employees')
                 .select('id')
                 .match({ tenant_id: tenantId, user_id: userId })
@@ -298,7 +371,7 @@ export class CalendarService {
 
             if (!employee) {
                 this.logger.log(`Creating missing employee for user: ${userId}`);
-                const { error: insertEmpError } = await this.supabase.getAdminClient()
+                const { error: insertEmpError } = await tenantClient
                     .from('employees')
                     .insert({
                         tenant_id: tenantId,
@@ -314,7 +387,7 @@ export class CalendarService {
             }
 
             // Check existence
-            const { data: existing, error: selectError } = await this.supabase.getAdminClient()
+            const { data: existing, error: selectError } = await tenantClient
                 .from('calendar_connections')
                 .select('*')
                 .match({
@@ -330,7 +403,7 @@ export class CalendarService {
 
             if (existing) {
                 this.logger.log(`Updating existing connection: ${existing.id}`);
-                const { data, error } = await this.supabase.getAdminClient()
+                const { data, error } = await tenantClient
                     .from('calendar_connections')
                     .update({
                         provider_account_id: googleUserId,
@@ -349,10 +422,10 @@ export class CalendarService {
                 }
                 this.logger.log('Connection updated successfully');
                 const connectionId = (data as any)[0].id;
-                return { connectionId };
+                return { connectionId, tenantId };
             } else {
                 this.logger.log('Creating new connection');
-                const { data, error } = await this.supabase.getAdminClient()
+                const { data, error } = await tenantClient
                     .from('calendar_connections')
                     .insert({
                         tenant_id: tenantId,
@@ -372,7 +445,7 @@ export class CalendarService {
                 }
                 this.logger.log('Connection created successfully');
                 const connectionId = (data as any)[0].id;
-                return { connectionId };
+                return { connectionId, tenantId };
             }
         } catch (error) {
             this.logger.error('Error in handleGoogleCallback', error);
@@ -440,8 +513,11 @@ export class CalendarService {
         const profile = await profileResponse.json();
         const msUserId = profile.id;
 
+        // Use tenant-specific schema client
+        const tenantClient = this.supabase.getClientForTenant(tenantId);
+
         // Check existence
-        const { data: existing } = await this.supabase.getAdminClient()
+        const { data: existing } = await tenantClient
             .from('calendar_connections')
             .select('*')
             .match({
@@ -456,7 +532,7 @@ export class CalendarService {
         expiresAt.setSeconds(expiresAt.getSeconds() + (tokens.expires_in || 3600));
 
         if (existing) {
-            return this.supabase.getAdminClient()
+            await tenantClient
                 .from('calendar_connections')
                 .update({
                     provider_account_id: msUserId,
@@ -467,8 +543,9 @@ export class CalendarService {
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', existing.id);
+            return { connectionId: existing.id, tenantId };
         } else {
-            return this.supabase.getAdminClient()
+            const { data, error } = await tenantClient
                 .from('calendar_connections')
                 .insert({
                     tenant_id: tenantId,
@@ -479,7 +556,14 @@ export class CalendarService {
                     refresh_token_encrypted: tokens.refresh_token,
                     token_expires_at: expiresAt.toISOString(),
                     status: ConnectionStatus.ACTIVE
-                });
+                })
+                .select();
+
+            if (error) {
+                throw new BadRequestException('Failed to create Microsoft calendar connection');
+            }
+            const connectionId = (data as any)[0].id;
+            return { connectionId, tenantId };
         }
     }
 }

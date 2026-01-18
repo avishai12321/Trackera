@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Res, UseGuards, Request, BadRequestException, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Query, Res, UseGuards, Request, BadRequestException, Param } from '@nestjs/common';
 import { CalendarService } from './calendar.service';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { AuthGuard } from '@nestjs/passport';
@@ -17,11 +17,23 @@ export class CalendarController {
         return this.calendarService.getConnections(tenantId, req.user.id);
     }
 
+    @Delete('connections/:connectionId')
+    @UseGuards(TenantGuard, AuthGuard('jwt'))
+    async disconnectCalendar(@Request() req: any, @Param('connectionId') connectionId: string) {
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new BadRequestException('Tenant context missing');
+        if (!connectionId) throw new BadRequestException('Connection ID is required');
+        await this.calendarService.disconnectCalendar(tenantId, req.user.id, connectionId);
+        return { message: 'Calendar disconnected successfully' };
+    }
+
     @Post('sync/:connectionId')
     @UseGuards(TenantGuard, AuthGuard('jwt'))
     async syncConnection(@Request() req: any, @Param('connectionId') connectionId: string) {
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new BadRequestException('Tenant context missing');
         if (!connectionId) throw new BadRequestException('Connection ID is required');
-        await this.calendarService.enqueueSync(connectionId);
+        await this.calendarService.enqueueSync(connectionId, tenantId);
         return { message: 'Sync initiated' };
     }
 
@@ -37,14 +49,11 @@ export class CalendarController {
     @Get('callback/google')
     async callbackGoogle(@Query('code') code: string, @Query('state') state: string, @Res() res: any) {
         // Exchange code for tokens
-        // State usually contains tenantId/userId or we infer?
-        // Actually, callback usually comes from browser so cookies/auth might be present?
-        // But OAuth callback often loses session context depending on browser policy (SameSite).
-        // Usually 'state' parameter preserves context.
+        // State contains tenantId/userId encoded in base64
 
         const response = await this.calendarService.handleGoogleCallback(code, state);
-        if (response.connectionId) {
-            await this.calendarService.enqueueSync(response.connectionId);
+        if (response.connectionId && response.tenantId) {
+            await this.calendarService.enqueueSync(response.connectionId, response.tenantId);
         }
         return res.redirect((process.env.FRONTEND_URL || 'http://localhost:3001') + '/calendar?status=success');
     }
@@ -60,8 +69,8 @@ export class CalendarController {
     @Get('callback/microsoft')
     async callbackMicrosoft(@Query('code') code: string, @Query('state') state: string, @Res() res: any) {
         const response = await this.calendarService.handleMicrosoftCallback(code, state);
-        if (response.data) {
-            await this.calendarService.enqueueSync((response.data as any).id);
+        if (response.connectionId && response.tenantId) {
+            await this.calendarService.enqueueSync(response.connectionId, response.tenantId);
         }
         return res.redirect((process.env.FRONTEND_URL || 'http://localhost:3001') + '/calendar?status=success');
     }
@@ -84,11 +93,10 @@ export class CalendarController {
         }
 
         if (resourceState === 'exists') {
-            // Find connection by channelId (we need to store channelId on connection or separate table?)
-            // For MVP, simplistic assumption: connectionId IS the channelId? 
+            // Find connection by channelId (connectionId IS the channelId)
             // Google requires channelId to be unique. Using connectionId matches.
-
-            await this.calendarService.enqueueSync(channelId);
+            // Use enqueueSyncByConnectionId since we don't have tenantId from webhook
+            await this.calendarService.enqueueSyncByConnectionId(channelId);
         }
 
         return res.status(200).send('OK');

@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '../../components/DashboardLayout';
 import { supabase, getCompanySchema } from '@/lib/supabase';
+import { DateFilterProvider, useDateFilter } from '@/contexts/DateFilterContext';
+import { DateRangePicker } from '@/components/DateRangePicker';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -43,52 +45,57 @@ export default function Dashboard() {
     if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
 
     return (
-        <DashboardLayout>
-            <div style={{ marginBottom: '2rem' }}>
-                <h1>Analytics Dashboard</h1>
-                <p style={{ color: '#64748b' }}>Comprehensive insights across company, projects, and employees</p>
-            </div>
+        <DateFilterProvider>
+            <DashboardLayout>
+                <div style={{ marginBottom: '2rem' }}>
+                    <h1>Analytics Dashboard</h1>
+                    <p style={{ color: '#64748b' }}>Comprehensive insights across company, projects, and employees</p>
+                </div>
 
-            {/* Tab Navigation */}
-            <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                borderBottom: '2px solid #e2e8f0',
-                marginBottom: '2rem',
-                overflow: 'auto'
-            }}>
-                {tabs.map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        style={{
-                            padding: '1rem 1.5rem',
-                            background: 'none',
-                            border: 'none',
-                            borderBottom: activeTab === tab.id ? '3px solid #6366f1' : '3px solid transparent',
-                            color: activeTab === tab.id ? '#6366f1' : '#64748b',
-                            fontWeight: activeTab === tab.id ? '600' : '400',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            fontSize: '0.95rem',
-                            whiteSpace: 'nowrap',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                        }}
-                    >
-                        <span>{tab.icon}</span>
-                        <span>{tab.label}</span>
-                    </button>
-                ))}
-            </div>
+                {/* Date Range Picker */}
+                <DateRangePicker />
 
-            {/* Tab Content */}
-            {activeTab === 'company' && <CompanyOverviewTab />}
-            {activeTab === 'project' && <ProjectViewTab />}
-            {activeTab === 'employee-overview' && <EmployeeOverviewTab />}
-            {activeTab === 'employee-deep-dive' && <EmployeeDeepDiveTab />}
-        </DashboardLayout>
+                {/* Tab Navigation */}
+                <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    borderBottom: '2px solid #e2e8f0',
+                    marginBottom: '2rem',
+                    overflow: 'auto'
+                }}>
+                    {tabs.map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                padding: '1rem 1.5rem',
+                                background: 'none',
+                                border: 'none',
+                                borderBottom: activeTab === tab.id ? '3px solid #6366f1' : '3px solid transparent',
+                                color: activeTab === tab.id ? '#6366f1' : '#64748b',
+                                fontWeight: activeTab === tab.id ? '600' : '400',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                fontSize: '0.95rem',
+                                whiteSpace: 'nowrap',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}
+                        >
+                            <span>{tab.icon}</span>
+                            <span>{tab.label}</span>
+                        </button>
+                    ))}
+                </div>
+
+                {/* Tab Content */}
+                {activeTab === 'company' && <CompanyOverviewTab />}
+                {activeTab === 'project' && <ProjectViewTab />}
+                {activeTab === 'employee-overview' && <EmployeeOverviewTab />}
+                {activeTab === 'employee-deep-dive' && <EmployeeDeepDiveTab />}
+            </DashboardLayout>
+        </DateFilterProvider>
     );
 }
 
@@ -96,6 +103,8 @@ export default function Dashboard() {
 // TAB 1: COMPANY OVERVIEW
 // ============================================
 function CompanyOverviewTab() {
+    const { dateFilter, isLoading: isDateLoading } = useDateFilter();
+    const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         projects: 0,
         employees: 0,
@@ -107,7 +116,10 @@ function CompanyOverviewTab() {
     const [projectKeys, setProjectKeys] = useState<string[]>([]);
 
     useEffect(() => {
+        if (isDateLoading) return; // Wait for date filter to initialize
+
         const fetchStats = async () => {
+            setLoading(true);
             try {
                 const schema = await getCompanySchema();
 
@@ -139,7 +151,15 @@ function CompanyOverviewTab() {
                     .select('id, name, total_budget, estimated_hours')
                     .eq('status', 'ACTIVE');
 
-                // Get time allocations to calculate execution rates
+                // Get time entries filtered by date range for actual hours
+                const { data: timeEntries } = await supabase
+                    .schema(schema)
+                    .from('time_entries')
+                    .select('project_id, employee_id, minutes')
+                    .gte('date', dateFilter.startDate)
+                    .lte('date', dateFilter.endDate);
+
+                // Get time allocations to calculate planned hours
                 const { data: allocations } = await supabase
                     .schema(schema)
                     .from('time_allocations')
@@ -148,30 +168,34 @@ function CompanyOverviewTab() {
                 if (projects) {
                     const totalIncome = projects.reduce((sum, p) => sum + (p.total_budget || 0), 0);
 
-                    // Calculate execution rate for each project (mock: random for now, real would compare actual vs planned)
+                    // Calculate execution rate for each project (actual hours / planned hours)
                     const projectsWithRates = projects.map(p => {
-                        // In real app, calculate actual hours / planned hours
-                        const executionRate = Math.floor(Math.random() * 60) + 40; // Mock 40-100%
+                        const plannedHours = allocations?.filter((a: any) => a.project_id === p.id)
+                            .reduce((sum: number, a: any) => sum + (a.allocated_hours || 0), 0) || 0;
+                        const actualMinutes = timeEntries?.filter((e: any) => e.project_id === p.id)
+                            .reduce((sum: number, e: any) => sum + (e.minutes || 0), 0) || 0;
+                        const actualHours = actualMinutes / 60;
+                        const executionRate = plannedHours > 0 ? Math.round((actualHours / plannedHours) * 100) : 0;
                         return {
                             ...p,
-                            executionRate
+                            executionRate: Math.min(executionRate, 100) // Cap at 100%
                         };
                     });
                     setOpenProjects(projectsWithRates);
 
-                    // Build stacked bar chart data: hours per project per employee
-                    if (employees && allocations) {
+                    // Build stacked bar chart data: actual hours per project per employee
+                    if (employees && timeEntries) {
                         const projectNames = projects.map(p => p.name);
                         setProjectKeys(projectNames);
 
                         const chartData = employees.map(emp => {
                             const empData: any = { name: `${emp.first_name}` };
                             projects.forEach(proj => {
-                                const projAllocs = allocations?.filter(
-                                    (a: any) => a.employee_id === emp.id && a.project_id === proj.id
+                                const projEntries = timeEntries?.filter(
+                                    (e: any) => e.employee_id === emp.id && e.project_id === proj.id
                                 ) || [];
-                                const totalHours = projAllocs.reduce((sum: number, a: any) => sum + (a.allocated_hours || 0), 0);
-                                empData[proj.name] = totalHours;
+                                const totalMinutes = projEntries.reduce((sum: number, e: any) => sum + (e.minutes || 0), 0);
+                                empData[proj.name] = Math.round(totalMinutes / 60); // Convert to hours
                             });
                             return empData;
                         });
@@ -192,11 +216,13 @@ function CompanyOverviewTab() {
                 }
             } catch (err) {
                 console.error('Error fetching stats:', err);
+            } finally {
+                setLoading(false);
             }
         };
 
         fetchStats();
-    }, []);
+    }, [dateFilter.startDate, dateFilter.endDate, isDateLoading]);
 
     // Color for execution rate
     const getExecutionColor = (rate: number) => {
@@ -207,6 +233,14 @@ function CompanyOverviewTab() {
 
     // Colors for stacked bars
     const STACK_COLORS = ['#c4b5fd', '#a78bfa', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95', '#3b0764'];
+
+    if (loading) {
+        return (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                <div>Loading company overview data...</div>
+            </div>
+        );
+    }
 
     return (
         <div>
@@ -304,6 +338,8 @@ function CompanyOverviewTab() {
 // TAB 2: PROJECT VIEW
 // ============================================
 function ProjectViewTab() {
+    const { dateFilter, isLoading: isDateLoading } = useDateFilter();
+    const [loading, setLoading] = useState(false);
     const [projects, setProjects] = useState<any[]>([]);
     const [selectedProjectId, setSelectedProjectId] = useState<string>('');
     const [projectStats, setProjectStats] = useState<any>(null);
@@ -315,6 +351,8 @@ function ProjectViewTab() {
     }, []);
 
     useEffect(() => {
+        if (isDateLoading) return;
+
         if (selectedProjectId) {
             loadProjectDetails(selectedProjectId);
         } else {
@@ -322,7 +360,7 @@ function ProjectViewTab() {
             setWorkDistribution([]);
             setMonthlyProgress([]);
         }
-    }, [selectedProjectId]);
+    }, [selectedProjectId, dateFilter.startDate, dateFilter.endDate, isDateLoading]);
 
     const loadProjects = async () => {
         try {
@@ -340,6 +378,7 @@ function ProjectViewTab() {
     };
 
     const loadProjectDetails = async (projectId: string) => {
+        setLoading(true);
         try {
             const schema = await getCompanySchema();
 
@@ -359,42 +398,74 @@ function ProjectViewTab() {
                 setProjectStats(project);
             }
 
-            // 2. Get Work Distribution (Hours per employee) -> Mocking via Time Allocations for now as we might not have time entries
-            // Ideally this comes from time_entries, but let's check allocs or entries.
-            // Let's use time_allocations as a proxy for "Planned Work" distribution if no entries exist
-            const { data: allocations } = await supabase
+            // 2. Get Work Distribution (actual hours per employee filtered by date range)
+            const { data: timeEntries } = await supabase
                 .schema(schema)
-                .from('time_allocations')
+                .from('time_entries')
                 .select(`
-                    allocated_hours,
+                    minutes,
                     employee:employee_id(first_name, last_name)
                 `)
-                .eq('project_id', projectId);
+                .eq('project_id', projectId)
+                .gte('date', dateFilter.startDate)
+                .lte('date', dateFilter.endDate);
 
-            if (allocations) {
+            if (timeEntries) {
                 const distMap = new Map();
-                allocations.forEach((a: any) => {
-                    const name = `${a.employee?.first_name} ${a.employee?.last_name}`;
+                timeEntries.forEach((entry: any) => {
+                    const name = `${entry.employee?.first_name} ${entry.employee?.last_name}`;
                     const current = distMap.get(name) || 0;
-                    distMap.set(name, current + a.allocated_hours);
+                    distMap.set(name, current + (entry.minutes / 60)); // Convert to hours
                 });
 
-                const distData = Array.from(distMap.entries()).map(([name, value]) => ({ name, value }));
+                const distData = Array.from(distMap.entries()).map(([name, value]) => ({
+                    name,
+                    value: Math.round(value * 10) / 10 // Round to 1 decimal
+                }));
                 setWorkDistribution(distData);
             }
 
-            // 3. Generate Dummy Monthly Progress (since we don't have historical snapshots easily)
-            // In a real app, this would query a time-series or aggregated view
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-            const mockProgress = months.map(m => ({
-                name: m,
-                planned: Math.floor(Math.random() * 100) + 50,
-                actual: Math.floor(Math.random() * 80) + 40
-            }));
-            setMonthlyProgress(mockProgress);
+            // 3. Get monthly progress (planned vs actual) by grouping time entries by month
+            const { data: allEntries } = await supabase
+                .schema(schema)
+                .from('time_entries')
+                .select('date, minutes')
+                .eq('project_id', projectId)
+                .gte('date', dateFilter.startDate)
+                .lte('date', dateFilter.endDate)
+                .order('date');
+
+            const { data: allocations } = await supabase
+                .schema(schema)
+                .from('time_allocations')
+                .select('allocated_hours, year, month')
+                .eq('project_id', projectId);
+
+            // Group by month
+            const monthlyMap = new Map();
+            allEntries?.forEach((entry: any) => {
+                const monthKey = entry.date.substring(0, 7); // YYYY-MM
+                const current = monthlyMap.get(monthKey) || 0;
+                monthlyMap.set(monthKey, current + (entry.minutes / 60));
+            });
+
+            // Build progress data
+            const progressData = Array.from(monthlyMap.entries()).map(([monthKey, actual]) => {
+                const [year, month] = monthKey.split('-').map(Number);
+                const planned = allocations?.find((a: any) => a.year === year && a.month === month)?.allocated_hours || 0;
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return {
+                    name: monthNames[month - 1],
+                    planned,
+                    actual: Math.round(actual)
+                };
+            });
+            setMonthlyProgress(progressData);
 
         } catch (err) {
             console.error('Error loading project details:', err);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -505,14 +576,17 @@ function ProjectViewTab() {
 // TAB 3: EMPLOYEE OVERVIEW
 // ============================================
 function EmployeeOverviewTab() {
+    const { dateFilter, isLoading: isDateLoading } = useDateFilter();
     const [employees, setEmployees] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (isDateLoading) return;
         loadEmployees();
-    }, []);
+    }, [dateFilter.startDate, dateFilter.endDate, isDateLoading]);
 
     const loadEmployees = async () => {
+        setLoading(true);
         try {
             const schema = await getCompanySchema();
 
@@ -525,26 +599,25 @@ function EmployeeOverviewTab() {
                 .order('first_name');
 
             if (employeesData) {
-                // 2. Get Allocations to calculate current projects and loads
-                const { data: allocations } = await supabase
+                // 2. Get time entries filtered by date range for actual hours
+                const { data: timeEntries } = await supabase
                     .schema(schema)
-                    .from('time_allocations')
-                    .select(`
-                        allocated_hours,
-                        employee_id,
-                        project:project_id(name)
-                    `);
+                    .from('time_entries')
+                    .select('employee_id, project_id, minutes, project:project_id(name)')
+                    .gte('date', dateFilter.startDate)
+                    .lte('date', dateFilter.endDate);
 
-                // Map allocations to employees
+                // Map time entries to employees
                 const enhancedEmployees = employeesData.map(emp => {
-                    const empAllocs = allocations?.filter((a: any) => a.employee_id === emp.id) || [];
-                    const projectNames = Array.from(new Set(empAllocs.map((a: any) => a.project?.name))).join(', ');
-                    const totalPlanned = empAllocs.reduce((sum: number, a: any) => sum + (a.allocated_hours || 0), 0);
+                    const empEntries = timeEntries?.filter((e: any) => e.employee_id === emp.id) || [];
+                    const projectNames = Array.from(new Set(empEntries.map((e: any) => e.project?.name).filter(Boolean))).join(', ');
+                    const totalMinutes = empEntries.reduce((sum: number, e: any) => sum + (e.minutes || 0), 0);
+                    const totalHours = Math.round(totalMinutes / 60);
 
                     return {
                         ...emp,
                         currentProjects: projectNames || 'None',
-                        monthlyPlanned: totalPlanned,
+                        monthlyPlanned: totalHours,
                         lastReport: 'N/A' // Placeholder
                     };
                 });
@@ -632,6 +705,8 @@ function EmployeeOverviewTab() {
 // TAB 4: EMPLOYEE DEEP DIVE
 // ============================================
 function EmployeeDeepDiveTab() {
+    const { dateFilter, isLoading: isDateLoading } = useDateFilter();
+    const [loading, setLoading] = useState(false);
     const [employees, setEmployees] = useState<any[]>([]);
     const [selectedEmpId, setSelectedEmpId] = useState<string>('');
     const [empStats, setEmpStats] = useState<any>(null);
@@ -642,13 +717,15 @@ function EmployeeDeepDiveTab() {
     }, []);
 
     useEffect(() => {
+        if (isDateLoading) return;
+
         if (selectedEmpId) {
             loadEmployeeDetails(selectedEmpId);
         } else {
             setEmpStats(null);
             setWorkloadData([]);
         }
-    }, [selectedEmpId]);
+    }, [selectedEmpId, dateFilter.startDate, dateFilter.endDate, isDateLoading]);
 
     const loadEmployees = async () => {
         try {
@@ -667,6 +744,7 @@ function EmployeeDeepDiveTab() {
     };
 
     const loadEmployeeDetails = async (empId: string) => {
+        setLoading(true);
         try {
             const schema = await getCompanySchema();
 
@@ -679,36 +757,61 @@ function EmployeeDeepDiveTab() {
                 .single();
 
             if (emp) {
-                // 2. Get Allocations for Workload
+                // 2. Get time entries filtered by date range for actual workload
+                const { data: timeEntries } = await supabase
+                    .schema(schema)
+                    .from('time_entries')
+                    .select('minutes, project:project_id(name)')
+                    .eq('employee_id', empId)
+                    .gte('date', dateFilter.startDate)
+                    .lte('date', dateFilter.endDate);
+
+                // 3. Get allocations for planned hours (for metrics calculation)
                 const { data: allocations } = await supabase
                     .schema(schema)
                     .from('time_allocations')
-                    .select(`
-                        allocated_hours,
-                        project:project_id(name)
-                    `)
+                    .select('allocated_hours, project_id')
                     .eq('employee_id', empId);
 
-                const projectCount = allocations ? new Set(allocations.map((a: any) => a.project?.name)).size : 0;
+                const projectSet = new Set(timeEntries?.map((e: any) => e.project?.name).filter(Boolean));
+                const projectCount = projectSet.size;
+
+                // Calculate metrics
+                const totalActualMinutes = timeEntries?.reduce((sum: number, e: any) => sum + (e.minutes || 0), 0) || 0;
+                const totalActualHours = totalActualMinutes / 60;
+                const totalPlannedHours = allocations?.reduce((sum: number, a: any) => sum + (a.allocated_hours || 0), 0) || 0;
+                const executionRate = totalPlannedHours > 0 ? Math.round((totalActualHours / totalPlannedHours) * 100) : 0;
+                const monthlyCapacity = emp.monthly_capacity || 160;
+                const occupancy = Math.round((totalActualHours / monthlyCapacity) * 100);
 
                 setEmpStats({
                     ...emp,
                     projectCount,
-                    successRate: '95%', // Placeholder
-                    occupancy: '88%', // Placeholder 
-                    executionRate: '92%' // Placeholder
+                    successRate: '95%', // Placeholder - would need quality/completion data
+                    occupancy: `${Math.min(occupancy, 100)}%`,
+                    executionRate: `${Math.min(executionRate, 100)}%`
                 });
 
-                if (allocations) {
-                    const data = allocations.map((a: any) => ({
-                        name: a.project?.name || 'Unknown',
-                        hours: a.allocated_hours
+                // Build workload distribution by project
+                if (timeEntries) {
+                    const projectMap = new Map();
+                    timeEntries.forEach((entry: any) => {
+                        const projectName = entry.project?.name || 'Unknown';
+                        const current = projectMap.get(projectName) || 0;
+                        projectMap.set(projectName, current + (entry.minutes / 60));
+                    });
+
+                    const data = Array.from(projectMap.entries()).map(([name, hours]) => ({
+                        name,
+                        hours: Math.round(hours as number)
                     }));
                     setWorkloadData(data);
                 }
             }
         } catch (err) {
             console.error('Error loading employee details:', err);
+        } finally {
+            setLoading(false);
         }
     };
 

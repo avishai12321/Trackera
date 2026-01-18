@@ -35,18 +35,24 @@ export class ProjectsController {
 
     @Get(':id')
     findOne(@Param('id') id: string) {
-        return this.projectsService.findOne(id);
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new Error('Tenant context missing');
+        return this.projectsService.findOne(id, tenantId);
     }
 
     @Patch(':id')
     @Roles(Role.OWNER, Role.ADMIN, Role.MANAGER)
     update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto) {
-        return this.projectsService.update(id, updateProjectDto);
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new Error('Tenant context missing');
+        return this.projectsService.update(id, updateProjectDto, tenantId);
     }
 
     @Delete(':id')
     @Roles(Role.OWNER, Role.ADMIN) // Only Admin/Owner can delete
     remove(@Param('id') id: string) {
-        return this.projectsService.remove(id);
+        const tenantId = TenantContext.getTenantId();
+        if (!tenantId) throw new Error('Tenant context missing');
+        return this.projectsService.remove(id, tenantId);
     }
 }

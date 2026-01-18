@@ -17,13 +17,13 @@ export class DashboardService {
      */
     private async getSchemaName(tenantId: string): Promise<string> {
         const { data, error } = await this.supabase.getAdminClient()
-            .from('companies')
+            .from('tenants')
             .select('schema_name')
             .eq('id', tenantId)
             .single();
 
         if (error || !data) {
-            throw new Error(`Company not found for tenant ID: ${tenantId}`);
+            throw new Error(`Tenant not found for tenant ID: ${tenantId}`);
         }
 
         return data.schema_name;
@@ -121,8 +121,11 @@ export class DashboardService {
      * LEGACY: Keep existing getStats method for backward compatibility
      */
     async getStats(tenantId: string, userId: string) {
+        // Use tenant-specific client for proper schema isolation
+        const client = this.supabase.getClientForTenant(tenantId);
+
         // 1. Resolve Employee ID
-        const { data: employee, error: empError } = await this.supabase.getAdminClient()
+        const { data: employee, error: empError } = await client
             .from('employees')
             .select('id')
             .eq('tenant_id', tenantId)
@@ -161,8 +164,6 @@ export class DashboardService {
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6);
         weekEnd.setHours(23, 59, 59, 999);
-
-        const client = this.supabase.getAdminClient();
 
         // Parallel Queries using Supabase
         const [
