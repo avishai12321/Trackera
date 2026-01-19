@@ -12,6 +12,7 @@ import { CalendarModule } from './calendar/calendar.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportsModule } from './reports/reports.module';
 import { EmployeeReviewsModule } from './employee-reviews/employee-reviews.module';
+import { ImportModule } from './import/import.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { EmployeeReviewsModule } from './employee-reviews/employee-reviews.modul
     DashboardModule,
     ReportsModule,
     EmployeeReviewsModule,
+    ImportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
