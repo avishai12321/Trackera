@@ -2,11 +2,14 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Bell, Search, User, LogOut } from 'lucide-react';
 import { signOut } from '@/lib/supabase';
+import LanguageSwitcher from './LanguageSwitcher';
 import styles from './Header.module.scss';
 
 export default function Header() {
+    const t = useTranslations('common');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
@@ -38,10 +41,11 @@ export default function Header() {
         <header className={styles.header}>
             <div className={styles.search}>
                 <Search size={18} className={styles.searchIcon} />
-                <input type="text" placeholder="Search..." />
+                <input type="text" placeholder={t('search')} />
             </div>
 
             <div className={styles.actions}>
+                <LanguageSwitcher />
                 <button className={styles.iconBtn}>
                     <Bell size={20} />
                     <span className={styles.badge} />
@@ -57,7 +61,7 @@ export default function Header() {
                         <div className={styles.dropdown}>
                             <button className={styles.dropdownItem} onClick={handleLogout}>
                                 <LogOut size={16} />
-                                <span>Log out</span>
+                                <span>{t('logout')}</span>
                             </button>
                         </div>
                     )}

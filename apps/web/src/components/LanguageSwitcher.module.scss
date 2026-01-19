@@ -1,0 +1,38 @@
+.switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #e2e8f0;
+  }
+}
+
+.icon {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.select {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding-right: 4px;
+
+  &:focus {
+    outline: none;
+  }
+
+  option {
+    background: white;
+    color: #334155;
+  }
+}
