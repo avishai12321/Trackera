@@ -1,0 +1,43 @@
+{
+  "common": {
+    "search": "Search...",
+    "logout": "Log out",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "email": "Email",
+    "password": "Password",
+    "emailPlaceholder": "you@company.com",
+    "expand": "Expand",
+    "collapse": "Collapse"
+  },
+  "brand": {
+    "name": "TRACKERA",
+    "tagline": "TRACK LESS, KNOW MORE"
+  },
+  "sidebar": {
+    "main": "Main",
+    "data": "Data",
+    "dashboard": "Dashboard",
+    "employees": "Employees",
+    "employeeReview": "Employee Review",
+    "clients": "Clients",
+    "projects": "Projects",
+    "timeAllocation": "Time Allocation",
+    "calendar": "Calendar",
+    "timeEntries": "Time Entries",
+    "reports": "Reports",
+    "importData": "Import Data",
+    "draftRecords": "Draft Records"
+  },
+  "dashboard": {
+    "title": "Analytics Dashboard",
+    "subtitle": "Comprehensive insights across company, projects, and employees",
+    "companyOverview": "Company Overview",
+    "projectView": "Project View",
+    "employeeOverview": "Employee Overview",
+    "employeeDeepDive": "Employee Deep Dive"
+  },
+  "errors": {
+    "generic": "An error occurred. Please try again."
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "common": {
+    "search": "חיפוש...",
+    "logout": "התנתק",
+    "signIn": "התחבר",
+    "signingIn": "מתחבר...",
+    "email": "אימייל",
+    "password": "סיסמה",
+    "emailPlaceholder": "you@company.com",
+    "expand": "הרחב",
+    "collapse": "כווץ"
+  },
+  "brand": {
+    "name": "TRACKERA",
+    "tagline": "עקוב פחות, דע יותר"
+  },
+  "sidebar": {
+    "main": "ראשי",
+    "data": "נתונים",
+    "dashboard": "לוח בקרה",
+    "employees": "עובדים",
+    "employeeReview": "סקירת עובדים",
+    "clients": "לקוחות",
+    "projects": "פרויקטים",
+    "timeAllocation": "הקצאת זמן",
+    "calendar": "לוח שנה",
+    "timeEntries": "רישומי זמן",
+    "reports": "דוחות",
+    "importData": "ייבוא נתונים",
+    "draftRecords": "טיוטות"
+  },
+  "dashboard": {
+    "title": "לוח בקרה אנליטי",
+    "subtitle": "תובנות מקיפות על החברה, פרויקטים ועובדים",
+    "companyOverview": "סקירת חברה",
+    "projectView": "תצוגת פרויקטים",
+    "employeeOverview": "סקירת עובדים",
+    "employeeDeepDive": "ניתוח מעמיק של עובדים"
+  },
+  "errors": {
+    "generic": "אירעה שגיאה. אנא נסה שוב."
+  }
+}

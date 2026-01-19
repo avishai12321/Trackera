@@ -1,10 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 export default function RootLogin() {
+    const t = useTranslations('common');
+    const tBrand = useTranslations('brand');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -42,7 +46,15 @@ export default function RootLogin() {
             alignItems: 'center',
             justifyContent: 'center',
             background: '#f8fafc',
+            position: 'relative',
         }}>
+            <div style={{
+                position: 'absolute',
+                top: '20px',
+                right: '20px',
+            }}>
+                <LanguageSwitcher />
+            </div>
             <div style={{
                 width: '100%',
                 maxWidth: '400px',
@@ -78,14 +90,14 @@ export default function RootLogin() {
                         letterSpacing: '0.1em',
                         marginBottom: '4px'
                     }}>
-                        TRACKERA
+                        {tBrand('name')}
                     </h1>
                     <p style={{
                         fontSize: '12px',
                         color: '#64748b',
                         letterSpacing: '0.05em'
                     }}>
-                        TRACK LESS, KNOW MORE
+                        {tBrand('tagline')}
                     </p>
                 </div>
 
@@ -114,13 +126,13 @@ export default function RootLogin() {
                             fontWeight: 500,
                             color: '#334155'
                         }}>
-                            Email
+                            {t('email')}
                         </label>
                         <input
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@company.com"
+                            placeholder={t('emailPlaceholder')}
                             required
                             style={{
                                 width: '100%',
@@ -150,7 +162,7 @@ export default function RootLogin() {
                             fontWeight: 500,
                             color: '#334155'
                         }}>
-                            Password
+                            {t('password')}
                         </label>
                         <input
                             type="password"
@@ -196,7 +208,7 @@ export default function RootLogin() {
                         onMouseEnter={(e) => !loading && (e.currentTarget.style.background = '#4f46e5')}
                         onMouseLeave={(e) => !loading && (e.currentTarget.style.background = '#6366f1')}
                     >
-                        {loading ? 'Signing in...' : 'Sign In'}
+                        {loading ? t('signingIn') : t('signIn')}
                     </button>
                 </form>
             </div>

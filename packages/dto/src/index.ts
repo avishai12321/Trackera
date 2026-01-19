@@ -11,3 +11,4 @@ export * from './calendar/calendar.dto';
 export * from './clients/clients.dto';
 export * from './time-allocations/time-allocations.dto';
 export * from './project-budgets/project-budgets.dto';
+export * from './employee-reviews/employee-reviews.dto';
