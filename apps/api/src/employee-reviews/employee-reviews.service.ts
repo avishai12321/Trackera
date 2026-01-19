@@ -200,35 +200,27 @@ export class EmployeeReviewsService {
             const headerColor = '#64748b';
             const valueColor = '#1e293b';
 
-            // Icon colors for each card type
-            const iconColors: Record<string, string> = {
-                'Employee': '#6366f1',        // indigo
-                'Presentation Skills': '#8b5cf6', // violet
-                'Time Management': '#3b82f6', // blue
-                'Excel Skills': '#10b981',    // emerald
-                'Proficiency': '#f59e0b',     // amber
-                'Transparency': '#06b6d4',    // cyan
-                'Creativity': '#ec4899',      // pink
-                'Overall': '#22c55e',         // green
-            };
+            // Icon color - black and white only
+            const iconColor = '#374151'; // dark gray for icons
+            const iconBgColor = '#f3f4f6'; // light gray background
 
             // Helper to draw icon based on type
-            const drawIcon = (x: number, y: number, type: string, color: string) => {
+            const drawIcon = (x: number, y: number, type: string) => {
                 const iconSize = 20;
                 const cx = x + iconSize / 2;
                 const cy = y + iconSize / 2;
 
-                // Draw circular background
-                doc.circle(cx, cy, iconSize / 2).fill(color + '20'); // Light background
+                // Draw circular background (light gray)
+                doc.circle(cx, cy, iconSize / 2).fill(iconBgColor);
 
-                doc.fillColor(color);
-                doc.strokeColor(color);
+                doc.fillColor(iconColor);
+                doc.strokeColor(iconColor);
                 doc.lineWidth(1.5);
 
                 switch (type) {
                     case 'Employee':
                         // Person icon - head and body
-                        doc.circle(cx, cy - 3, 4).fill(color);
+                        doc.circle(cx, cy - 3, 4).fill(iconColor);
                         doc.moveTo(cx - 5, cy + 8).lineTo(cx - 5, cy + 4).bezierCurveTo(cx - 5, cy + 1, cx + 5, cy + 1, cx + 5, cy + 4).lineTo(cx + 5, cy + 8).stroke();
                         break;
                     case 'Presentation Skills':
@@ -250,14 +242,14 @@ export class EmployeeReviewsService {
                         break;
                     case 'Proficiency':
                         // Chart/bar icon
-                        doc.rect(cx - 5, cy + 1, 3, 6).fill(color);
-                        doc.rect(cx - 1, cy - 2, 3, 9).fill(color);
-                        doc.rect(cx + 3, cy - 5, 3, 12).fill(color);
+                        doc.rect(cx - 5, cy + 1, 3, 6).fill(iconColor);
+                        doc.rect(cx - 1, cy - 2, 3, 9).fill(iconColor);
+                        doc.rect(cx + 3, cy - 5, 3, 12).fill(iconColor);
                         break;
                     case 'Transparency':
                         // Eye icon
                         doc.moveTo(cx - 7, cy).bezierCurveTo(cx - 4, cy - 5, cx + 4, cy - 5, cx + 7, cy).bezierCurveTo(cx + 4, cy + 5, cx - 4, cy + 5, cx - 7, cy).stroke();
-                        doc.circle(cx, cy, 3).fill(color);
+                        doc.circle(cx, cy, 3).fill(iconColor);
                         break;
                     case 'Creativity':
                         // Lightbulb icon
@@ -278,7 +270,7 @@ export class EmployeeReviewsService {
                             const py = cy + Math.sin(angle) * radius;
                             doc.lineTo(px, py);
                         }
-                        doc.closePath().fill(color);
+                        doc.closePath().fill(iconColor);
                         doc.restore();
                         break;
                     default:
@@ -290,15 +282,13 @@ export class EmployeeReviewsService {
 
             // Helper to draw a card with icon
             const drawCard = (x: number, y: number, title: string, value: string, subtitle?: string) => {
-                const iconColor = iconColors[title] || '#64748b';
-
                 // Card background with subtle shadow effect
                 doc.roundedRect(x + 1, y + 1, cardWidth, cardHeight, 8).fill('#00000008');
                 doc.roundedRect(x, y, cardWidth, cardHeight, 8).fill('white');
                 doc.roundedRect(x, y, cardWidth, cardHeight, 8).strokeColor(borderColor).stroke();
 
-                // Draw icon
-                drawIcon(x + 12, y + 12, title, iconColor);
+                // Draw icon (black and white)
+                drawIcon(x + 12, y + 12, title);
 
                 // Title
                 doc.fillColor(headerColor)
@@ -374,16 +364,18 @@ export class EmployeeReviewsService {
             const textBoxWidth = (pageWidth - 20) / 3;
             const textBoxHeight = 200;
 
-            // Text box colors and icons
-            const textBoxStyles: Record<string, { color: string; bgColor: string; iconType: string }> = {
-                'Overall Review': { color: '#6366f1', bgColor: '#eef2ff', iconType: 'review' },
-                'Action Items': { color: '#f59e0b', bgColor: '#fffbeb', iconType: 'action' },
-                'Employee Commentary': { color: '#06b6d4', bgColor: '#ecfeff', iconType: 'comment' },
+            // Text box styles - black and white icons
+            const textBoxStyles: Record<string, { iconType: string }> = {
+                'Overall Review': { iconType: 'review' },
+                'Action Items': { iconType: 'action' },
+                'Employee Commentary': { iconType: 'comment' },
             };
+            const textBoxHeaderBg = '#f8fafc';
+            const textBoxIconColor = '#374151';
 
             // Helper for improved text box
             const drawTextBox = (x: number, y: number, width: number, title: string, content: string | string[], positiveSkills?: string[], improvementSkills?: string[]) => {
-                const style = textBoxStyles[title] || { color: '#64748b', bgColor: '#f8fafc', iconType: 'default' };
+                const style = textBoxStyles[title] || { iconType: 'default' };
 
                 // Shadow effect
                 doc.roundedRect(x + 2, y + 2, width, textBoxHeight, 10).fill('#00000008');
@@ -392,30 +384,30 @@ export class EmployeeReviewsService {
                 doc.roundedRect(x, y, width, textBoxHeight, 10).fill('white');
                 doc.roundedRect(x, y, width, textBoxHeight, 10).strokeColor(borderColor).stroke();
 
-                // Colored header bar
+                // Gray header bar
                 doc.save();
                 doc.roundedRect(x, y, width, 36, 10).clip();
-                doc.rect(x, y, width, 36).fill(style.bgColor);
+                doc.rect(x, y, width, 36).fill(textBoxHeaderBg);
                 doc.restore();
                 doc.moveTo(x, y + 36).lineTo(x + width, y + 36).strokeColor(borderColor).stroke();
 
-                // Icon in header
+                // Icon in header (black and white)
                 const iconX = x + 14;
                 const iconY = y + 11;
-                doc.fillColor(style.color);
-                doc.strokeColor(style.color);
+                doc.fillColor(textBoxIconColor);
+                doc.strokeColor(textBoxIconColor);
                 doc.lineWidth(1.5);
 
                 if (style.iconType === 'review') {
                     // Clipboard with checkmark
                     doc.rect(iconX, iconY, 12, 14).stroke();
-                    doc.rect(iconX + 3, iconY - 2, 6, 4).fill(style.color);
+                    doc.rect(iconX + 3, iconY - 2, 6, 4).fill(textBoxIconColor);
                     doc.moveTo(iconX + 3, iconY + 8).lineTo(iconX + 5, iconY + 10).lineTo(iconX + 9, iconY + 6).stroke();
                 } else if (style.iconType === 'action') {
                     // Checklist icon
-                    doc.rect(iconX, iconY + 1, 4, 4).fill(style.color);
+                    doc.rect(iconX, iconY + 1, 4, 4).fill(textBoxIconColor);
                     doc.moveTo(iconX + 6, iconY + 3).lineTo(iconX + 14, iconY + 3).stroke();
-                    doc.rect(iconX, iconY + 8, 4, 4).fill(style.color);
+                    doc.rect(iconX, iconY + 8, 4, 4).fill(textBoxIconColor);
                     doc.moveTo(iconX + 6, iconY + 10).lineTo(iconX + 14, iconY + 10).stroke();
                 } else if (style.iconType === 'comment') {
                     // Chat bubble icon
@@ -424,8 +416,8 @@ export class EmployeeReviewsService {
 
                 doc.lineWidth(1);
 
-                // Title
-                doc.fillColor(style.color)
+                // Title (dark gray)
+                doc.fillColor(valueColor)
                     .fontSize(11)
                     .font('Helvetica-Bold')
                     .text(title, x + 32, y + 12, { width: width - 44 });
@@ -438,14 +430,14 @@ export class EmployeeReviewsService {
                 if (title === 'Overall Review' && (positiveSkills?.length || improvementSkills?.length)) {
                     // Special handling for overall review with sections
                     if (positiveSkills?.length) {
-                        doc.fillColor('#22c55e').font('Helvetica-Bold').fontSize(9)
+                        doc.fillColor(valueColor).font('Helvetica-Bold').fontSize(9)
                             .text('Positive Skills', x + 14, contentY, { width: width - 28 });
                         contentY += 14;
-                        doc.fillColor(valueColor).font('Helvetica');
+                        doc.font('Helvetica');
                         positiveSkills.forEach((skill) => {
                             if (contentY < y + textBoxHeight - 30) {
-                                // Green bullet
-                                doc.circle(x + 18, contentY + 4, 2).fill('#22c55e');
+                                // Gray bullet
+                                doc.circle(x + 18, contentY + 4, 2).fill(textBoxIconColor);
                                 doc.fillColor(valueColor).text(skill, x + 26, contentY, { width: width - 40 });
                                 contentY += 13;
                             }
@@ -454,14 +446,14 @@ export class EmployeeReviewsService {
                     }
 
                     if (improvementSkills?.length) {
-                        doc.fillColor('#ef4444').font('Helvetica-Bold').fontSize(9)
+                        doc.fillColor(valueColor).font('Helvetica-Bold').fontSize(9)
                             .text('Areas for Improvement', x + 14, contentY, { width: width - 28 });
                         contentY += 14;
-                        doc.fillColor(valueColor).font('Helvetica');
+                        doc.font('Helvetica');
                         improvementSkills.forEach((skill) => {
                             if (contentY < y + textBoxHeight - 20) {
-                                // Red bullet
-                                doc.circle(x + 18, contentY + 4, 2).fill('#ef4444');
+                                // Gray bullet
+                                doc.circle(x + 18, contentY + 4, 2).fill(textBoxIconColor);
                                 doc.fillColor(valueColor).text(skill, x + 26, contentY, { width: width - 40 });
                                 contentY += 13;
                             }
@@ -474,7 +466,7 @@ export class EmployeeReviewsService {
                 } else if (Array.isArray(content)) {
                     content.forEach((item) => {
                         if (contentY < y + textBoxHeight - 20) {
-                            doc.circle(x + 18, contentY + 4, 2).fill(style.color);
+                            doc.circle(x + 18, contentY + 4, 2).fill(textBoxIconColor);
                             doc.fillColor(valueColor).text(item, x + 26, contentY, { width: width - 40 });
                             contentY += 13;
                         }
