@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Clock, Calendar, FolderKanban, LogOut, Upload, FileCheck, Users, Building2, ClipboardList, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { LayoutDashboard, Clock, Calendar, FolderKanban, LogOut, Upload, FileCheck, Users, Building2, ClipboardList, ChevronLeft, ChevronRight, FileText, ClipboardCheck } from 'lucide-react';
 import styles from './Sidebar.module.scss';
 import clsx from 'clsx';
 import { useRouter } from 'next/navigation';
@@ -11,6 +11,7 @@ import { signOut } from '@/lib/supabase';
 const mainMenuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { name: 'Employees', icon: Users, href: '/employees' },
+    { name: 'Employee Review', icon: ClipboardCheck, href: '/employee-reviews' },
     { name: 'Clients', icon: Building2, href: '/clients' },
     { name: 'Projects', icon: FolderKanban, href: '/projects' },
     { name: 'Time Allocation', icon: ClipboardList, href: '/time-allocation' },

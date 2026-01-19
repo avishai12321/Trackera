@@ -11,6 +11,7 @@ import { TimeEntriesModule } from './time-entries/time-entries.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReportsModule } from './reports/reports.module';
+import { EmployeeReviewsModule } from './employee-reviews/employee-reviews.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ReportsModule } from './reports/reports.module';
     CalendarModule,
     DashboardModule,
     ReportsModule,
+    EmployeeReviewsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
