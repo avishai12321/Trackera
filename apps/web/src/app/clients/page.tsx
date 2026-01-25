@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Plus, Trash2, Edit2, X, Check } from 'lucide-react';
 import { supabase, getCompanySchema, insertCompanyTable, updateCompanyTable, deleteCompanyTable } from '@/lib/supabase';
@@ -31,6 +32,8 @@ interface Client {
 
 export default function Clients() {
     const router = useRouter();
+    const t = useTranslations('clients');
+    const tCommon = useTranslations('common');
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -212,7 +215,7 @@ export default function Clients() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete client? This will affect all associated projects.')) return;
+        if (!confirm(t('deleteConfirm'))) return;
 
         try {
             await deleteCompanyTable('clients', id);
@@ -222,46 +225,46 @@ export default function Clients() {
         }
     };
 
-    if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+    if (loading) return <DashboardLayout><div>{tCommon('loading')}</div></DashboardLayout>;
 
     return (
         <DashboardLayout>
             {/* Header with Add Button */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
-                    <h1>Clients</h1>
-                    <p style={{ color: '#64748b' }}>Manage your client information and contracts.</p>
+                    <h1>{t('title')}</h1>
+                    <p style={{ color: '#64748b' }}>{t('subtitle')}</p>
                 </div>
                 <button
                     onClick={() => setShowAddForm(true)}
                     className="btn btn-primary"
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
-                    <Plus size={18} /> Add Client
+                    <Plus size={18} /> {t('addClient')}
                 </button>
             </div>
 
             {/* Clients Table - Main Content */}
             <div className="card" style={{ overflow: 'hidden' }}>
-                <h3 style={{ marginBottom: '1rem' }}>All Clients ({clients.length})</h3>
+                <h3 style={{ marginBottom: '1rem' }}>{t('allClients')} ({clients.length})</h3>
                 {clients.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                        <p>No clients yet. Click "Add Client" to create your first one.</p>
+                        <p>{t('noClients')}</p>
                     </div>
                 ) : (
                     <div style={{ overflowX: 'auto', width: '100%' }}>
                         <table style={{ width: '100%' }}>
                             <thead>
                                 <tr>
-                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>Actions</th>
-                                    <th>Name</th>
-                                    <th>Code</th>
-                                    <th>Contact Person</th>
-                                    <th>Email</th>
-                                    <th>Phone</th>
-                                    <th>Location</th>
-                                    <th>Billing Rate</th>
-                                    <th>Status</th>
+                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>{tCommon('actions')}</th>
+                                    <th>{tCommon('name')}</th>
+                                    <th>{tCommon('code')}</th>
+                                    <th>{t('contactPerson')}</th>
+                                    <th>{tCommon('email')}</th>
+                                    <th>{t('phone')}</th>
+                                    <th>{t('location')}</th>
+                                    <th>{t('billingRate')}</th>
+                                    <th>{tCommon('status')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -440,7 +443,7 @@ export default function Clients() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Plus size={18} /> Add Client
+                                <Plus size={18} /> {t('addClient')}
                             </h3>
                             <button onClick={() => { setShowAddForm(false); resetForm(); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                                 <X size={24} />
@@ -452,18 +455,18 @@ export default function Clients() {
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                             {/* Basic Information */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Basic Information</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{t('basicInfo')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Name *</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('name')} *</label>
                                         <input type="text" placeholder="Client Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Code</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('code')}</label>
                                         <input type="text" placeholder="CLI-001" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Contact Person</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('contactPerson')}</label>
                                         <input type="text" placeholder="John Doe" value={formData.contactPerson} onChange={e => setFormData({ ...formData, contactPerson: e.target.value })} />
                                     </div>
                                 </div>
@@ -471,14 +474,14 @@ export default function Clients() {
 
                             {/* Contact Information */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Contact Information</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{t('contactInfo')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Email</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('email')}</label>
                                         <input type="email" placeholder="client@example.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Phone</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('phone')}</label>
                                         <input type="tel" placeholder="+1234567890" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
                                     </div>
                                 </div>
@@ -486,26 +489,26 @@ export default function Clients() {
 
                             {/* Address */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Address</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{t('address')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '2fr 1fr 1fr 1fr 1fr' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Address</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('address')}</label>
                                         <input type="text" placeholder="123 Main St" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>City</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('city')}</label>
                                         <input type="text" placeholder="New York" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>State</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('state')}</label>
                                         <input type="text" placeholder="NY" value={formData.state} onChange={e => setFormData({ ...formData, state: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Postal Code</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('postalCode')}</label>
                                         <input type="text" placeholder="10001" value={formData.postalCode} onChange={e => setFormData({ ...formData, postalCode: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Country</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('country')}</label>
                                         <input type="text" placeholder="USA" value={formData.country} onChange={e => setFormData({ ...formData, country: e.target.value })} />
                                     </div>
                                 </div>
@@ -513,18 +516,18 @@ export default function Clients() {
 
                             {/* Company Details */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Company Details</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{t('companyDetails')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Registration Number</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('registrationNumber')}</label>
                                         <input type="text" placeholder="123456789" value={formData.companyRegistrationNumber} onChange={e => setFormData({ ...formData, companyRegistrationNumber: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Tax ID</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('taxId')}</label>
                                         <input type="text" placeholder="XX-XXXXXXX" value={formData.taxId} onChange={e => setFormData({ ...formData, taxId: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>VAT Number</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('vatNumber')}</label>
                                         <input type="text" placeholder="EU123456789" value={formData.vatNumber} onChange={e => setFormData({ ...formData, vatNumber: e.target.value })} />
                                     </div>
                                 </div>
@@ -532,14 +535,14 @@ export default function Clients() {
 
                             {/* Billing Information */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Billing Information</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{t('billingInfo')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Default Billing Rate</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('defaultBillingRate')}</label>
                                         <input type="number" step="0.01" placeholder="150.00" value={formData.defaultBillingRate} onChange={e => setFormData({ ...formData, defaultBillingRate: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('currency')}</label>
                                         <select value={formData.currency} onChange={e => setFormData({ ...formData, currency: e.target.value })}>
                                             <option value="USD">USD</option>
                                             <option value="EUR">EUR</option>
@@ -548,7 +551,7 @@ export default function Clients() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Payment Terms</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('paymentTerms')}</label>
                                         <input type="text" placeholder="Net 30" value={formData.paymentTerms} onChange={e => setFormData({ ...formData, paymentTerms: e.target.value })} />
                                     </div>
                                 </div>
@@ -556,18 +559,18 @@ export default function Clients() {
 
                             {/* Contract Information */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Contract Information</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{t('contractInfo')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr 2fr' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Contract Start Date</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('contractStartDate')}</label>
                                         <input type="date" value={formData.contractStartDate} onChange={e => setFormData({ ...formData, contractStartDate: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Contract End Date</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('contractEndDate')}</label>
                                         <input type="date" value={formData.contractEndDate} onChange={e => setFormData({ ...formData, contractEndDate: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Contract Notes</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('contractNotes')}</label>
                                         <input type="text" placeholder="Additional contract details..." value={formData.contractNotes} onChange={e => setFormData({ ...formData, contractNotes: e.target.value })} />
                                     </div>
                                 </div>
@@ -575,10 +578,10 @@ export default function Clients() {
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                                 <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} className="btn" style={{ background: '#e2e8f0' }}>
-                                    Cancel
+                                    {tCommon('cancel')}
                                 </button>
                                 <button type="submit" className="btn btn-primary">
-                                    <Plus size={18} /> Add Client
+                                    <Plus size={18} /> {t('addClient')}
                                 </button>
                             </div>
                         </form>

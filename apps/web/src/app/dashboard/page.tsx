@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
+import { useTranslations } from 'next-intl';
 import DashboardLayout from '../../components/DashboardLayout';
 import { supabase, getCompanySchema } from '@/lib/supabase';
 import { DateFilterProvider, useDateFilter } from '@/contexts/DateFilterContext';
@@ -22,6 +23,8 @@ type TabType = 'company' | 'project' | 'employee-overview' | 'employee-deep-dive
 
 export default function Dashboard() {
     const router = useRouter();
+    const t = useTranslations('dashboard');
+    const tCommon = useTranslations('common');
     const [activeTab, setActiveTab] = useState<TabType>('company');
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<any>(null);
@@ -45,20 +48,20 @@ export default function Dashboard() {
     }
 
     const tabs = [
-        { id: 'company' as TabType, label: 'Company Overview' },
-        { id: 'project' as TabType, label: 'Project View' },
-        { id: 'employee-overview' as TabType, label: 'Employee Overview' },
-        { id: 'employee-deep-dive' as TabType, label: 'Employee Deep Dive' }
+        { id: 'company' as TabType, label: t('companyOverview') },
+        { id: 'project' as TabType, label: t('projectView') },
+        { id: 'employee-overview' as TabType, label: t('employeeOverview') },
+        { id: 'employee-deep-dive' as TabType, label: t('employeeDeepDive') }
     ];
 
-    if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+    if (loading) return <DashboardLayout><div>{tCommon('loading')}</div></DashboardLayout>;
 
     return (
         <DateFilterProvider>
             <DashboardLayout>
                 <div style={{ marginBottom: '2rem' }}>
-                    <h1>Analytics Dashboard</h1>
-                    <p style={{ color: '#64748b' }}>Comprehensive insights across company, projects, and employees</p>
+                    <h1>{t('title')}</h1>
+                    <p style={{ color: '#64748b' }}>{t('subtitle')}</p>
                 </div>
 
                 {/* Date Range Picker */}

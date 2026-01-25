@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Plus, Trash2, Edit2, X, Check } from 'lucide-react';
 import { supabase, getCompanySchema, insertCompanyTable, updateCompanyTable, deleteCompanyTable } from '@/lib/supabase';
@@ -37,6 +38,8 @@ interface Employee {
 
 export default function Projects() {
     const router = useRouter();
+    const t = useTranslations('projects');
+    const tCommon = useTranslations('common');
     const [projects, setProjects] = useState<Project[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -228,7 +231,7 @@ export default function Projects() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete project?')) return;
+        if (!confirm(t('deleteConfirm'))) return;
 
         try {
             await deleteCompanyTable('projects', id);
@@ -238,47 +241,47 @@ export default function Projects() {
         }
     };
 
-    if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+    if (loading) return <DashboardLayout><div>{tCommon('loading')}</div></DashboardLayout>;
 
     return (
         <DashboardLayout>
             {/* Header with Add Button */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
-                    <h1>Projects</h1>
-                    <p style={{ color: '#64748b' }}>Manage your organization's projects.</p>
+                    <h1>{t('title')}</h1>
+                    <p style={{ color: '#64748b' }}>{t('subtitle')}</p>
                 </div>
                 <button
                     onClick={() => setShowAddForm(true)}
                     className="btn btn-primary"
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
-                    <Plus size={18} /> Add Project
+                    <Plus size={18} /> {t('addProject')}
                 </button>
             </div>
 
             {/* Projects Table - Main Content */}
             <div className="card" style={{ overflow: 'hidden' }}>
-                <h3 style={{ marginBottom: '1rem' }}>All Projects ({projects.length})</h3>
+                <h3 style={{ marginBottom: '1rem' }}>{t('allProjects')} ({projects.length})</h3>
                 {projects.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                        <p>No projects yet. Click "Add Project" to create your first one.</p>
+                        <p>{t('noProjects')}</p>
                     </div>
                 ) : (
                     <div style={{ overflowX: 'auto', width: '100%' }}>
                         <table style={{ width: '100%' }}>
                             <thead>
                                 <tr>
-                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>Actions</th>
-                                    <th>Name</th>
-                                    <th>Code</th>
-                                    <th>Client</th>
-                                    <th>Manager</th>
-                                    <th>Budget Type</th>
-                                    <th>Budget/Rate</th>
-                                    <th>Start Date</th>
-                                    <th>End Date</th>
-                                    <th>Status</th>
+                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>{tCommon('actions')}</th>
+                                    <th>{tCommon('name')}</th>
+                                    <th>{tCommon('code')}</th>
+                                    <th>{t('client')}</th>
+                                    <th>{t('projectManager')}</th>
+                                    <th>{t('budgetType')}</th>
+                                    <th>{t('budget')}</th>
+                                    <th>{t('startDate')}</th>
+                                    <th>{t('endDate')}</th>
+                                    <th>{tCommon('status')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -492,7 +495,7 @@ export default function Projects() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Plus size={18} /> Add Project
+                                <Plus size={18} /> {t('addProject')}
                             </h3>
                             <button onClick={() => { setShowAddForm(false); resetForm(); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                                 <X size={24} />
@@ -504,18 +507,18 @@ export default function Projects() {
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                             {/* Basic Information */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Basic Information</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('basicInfo')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Name *</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('name')} *</label>
                                         <input type="text" placeholder="Project Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Code</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('code')}</label>
                                         <input type="text" placeholder="PRJ-001" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
                                     </div>
                                     <div style={{ gridColumn: '1 / -1' }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Description</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('description')}</label>
                                         <input type="text" placeholder="Project description..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
                                     </div>
                                 </div>
@@ -523,21 +526,21 @@ export default function Projects() {
 
                             {/* Client & Manager */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Client & Manager</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('clientManager')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Client</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('client')}</label>
                                         <select value={formData.clientId} onChange={e => setFormData({ ...formData, clientId: e.target.value })}>
-                                            <option value="">No Client</option>
+                                            <option value="">{tCommon('noClient')}</option>
                                             {clients.map((client) => (
                                                 <option key={client.id} value={client.id}>{client.name}</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Project Manager</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('projectManager')}</label>
                                         <select value={formData.managerId} onChange={e => setFormData({ ...formData, managerId: e.target.value })}>
-                                            <option value="">No Manager</option>
+                                            <option value="">{tCommon('noManager')}</option>
                                             {employees.map((emp) => (
                                                 <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
                                             ))}
@@ -548,21 +551,21 @@ export default function Projects() {
 
                             {/* Budget Configuration */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Budget Configuration</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('budgetConfig')}</h4>
                                 <div style={{ marginBottom: '1rem' }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Budget Type</label>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('budgetType')}</label>
                                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                                             <input type="radio" value="FIXED" checked={formData.budgetType === 'FIXED'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
-                                            <span>Fixed Budget</span>
+                                            <span>{tCommon('fixedBudget')}</span>
                                         </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                                             <input type="radio" value="HOURLY_RATE" checked={formData.budgetType === 'HOURLY_RATE'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
-                                            <span>Hourly Rate</span>
+                                            <span>{t('hourlyRate')}</span>
                                         </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                                             <input type="radio" value="MONTHLY_RATE" checked={formData.budgetType === 'MONTHLY_RATE'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
-                                            <span>Monthly Rate</span>
+                                            <span>{tCommon('monthlyRate')}</span>
                                         </label>
                                     </div>
                                 </div>
@@ -628,14 +631,14 @@ export default function Projects() {
 
                             {/* Timeline */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Timeline</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('timeline')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Start Date</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('startDate')}</label>
                                         <input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>End Date</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('endDate')}</label>
                                         <input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
                                     </div>
                                 </div>
@@ -643,10 +646,10 @@ export default function Projects() {
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                                 <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} className="btn" style={{ background: '#e2e8f0' }}>
-                                    Cancel
+                                    {tCommon('cancel')}
                                 </button>
                                 <button type="submit" className="btn btn-primary">
-                                    <Plus size={18} /> Add Project
+                                    <Plus size={18} /> {t('addProject')}
                                 </button>
                             </div>
                         </form>

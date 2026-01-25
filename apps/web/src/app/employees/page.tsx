@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Plus, Trash2, Edit2, X, Check } from 'lucide-react';
 import { supabase, getCompanySchema, insertCompanyTable, updateCompanyTable, deleteCompanyTable } from '@/lib/supabase';
@@ -27,6 +28,8 @@ interface Employee {
 
 export default function Employees() {
     const router = useRouter();
+    const t = useTranslations('employees');
+    const tCommon = useTranslations('common');
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -200,47 +203,47 @@ export default function Employees() {
         }
     };
 
-    if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+    if (loading) return <DashboardLayout><div>{tCommon('loading')}</div></DashboardLayout>;
 
     return (
         <DashboardLayout>
             {/* Header with Add Button */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
-                    <h1>Employees</h1>
-                    <p style={{ color: '#64748b' }}>Manage your team members and their information.</p>
+                    <h1>{t('title')}</h1>
+                    <p style={{ color: '#64748b' }}>{t('subtitle')}</p>
                 </div>
                 <button
                     onClick={() => setShowAddForm(true)}
                     className="btn btn-primary"
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >
-                    <Plus size={18} /> Add Employee
+                    <Plus size={18} /> {t('addEmployee')}
                 </button>
             </div>
 
             {/* Employees Table - Main Content */}
             <div className="card" style={{ overflow: 'hidden' }}>
-                <h3 style={{ marginBottom: '1rem' }}>All Employees ({employees.length})</h3>
+                <h3 style={{ marginBottom: '1rem' }}>{t('allEmployees')} ({employees.length})</h3>
                 {employees.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                        <p>No employees yet. Click "Add Employee" to create your first one.</p>
+                        <p>{t('noEmployees')}</p>
                     </div>
                 ) : (
                     <div style={{ overflowX: 'auto', width: '100%' }}>
                         <table style={{ width: '100%' }}>
                             <thead>
                                 <tr>
-                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>Actions</th>
-                                    <th>Name</th>
-                                    <th>Position</th>
-                                    <th>Department</th>
-                                    <th>Level</th>
-                                    <th>Manager</th>
-                                    <th>Email</th>
-                                    <th>Capacity</th>
-                                    <th>Hire Date</th>
-                                    <th>Status</th>
+                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>{tCommon('actions')}</th>
+                                    <th>{tCommon('name')}</th>
+                                    <th>{t('position')}</th>
+                                    <th>{t('department')}</th>
+                                    <th>{t('level')}</th>
+                                    <th>{t('manager')}</th>
+                                    <th>{tCommon('email')}</th>
+                                    <th>{tCommon('capacity')}</th>
+                                    <th>{t('hireDate')}</th>
+                                    <th>{tCommon('status')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -427,7 +430,7 @@ export default function Employees() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Plus size={18} /> Add Employee
+                                <Plus size={18} /> {t('addEmployee')}
                             </h3>
                             <button onClick={() => { setShowAddForm(false); resetForm(); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                                 <X size={24} />
@@ -439,22 +442,22 @@ export default function Employees() {
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                             {/* Personal Information */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Personal Information</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('personalInfo')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>First Name *</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('firstName')} *</label>
                                         <input type="text" placeholder="John" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} required />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Last Name *</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('lastName')} *</label>
                                         <input type="text" placeholder="Doe" value={formData.lastName} onChange={e => setFormData({ ...formData, lastName: e.target.value })} required />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Email</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('email')}</label>
                                         <input type="email" placeholder="john.doe@example.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Employee Code</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('employeeCode')}</label>
                                         <input type="text" placeholder="EMP-001" value={formData.employeeCode} onChange={e => setFormData({ ...formData, employeeCode: e.target.value })} />
                                     </div>
                                 </div>
@@ -462,20 +465,20 @@ export default function Employees() {
 
                             {/* Job Information */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Job Information</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('jobInfo')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Position</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('position')}</label>
                                         <input type="text" placeholder="Software Engineer" value={formData.position} onChange={e => setFormData({ ...formData, position: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Department</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('department')}</label>
                                         <input type="text" placeholder="Engineering" value={formData.department} onChange={e => setFormData({ ...formData, department: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Level</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('level')}</label>
                                         <select value={formData.level} onChange={e => setFormData({ ...formData, level: e.target.value })}>
-                                            <option value="">Select Level</option>
+                                            <option value="">{tCommon('selectLevel')}</option>
                                             <option value="Junior">Junior</option>
                                             <option value="Mid">Mid</option>
                                             <option value="Senior">Senior</option>
@@ -484,9 +487,9 @@ export default function Employees() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Manager</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('manager')}</label>
                                         <select value={formData.managerId} onChange={e => setFormData({ ...formData, managerId: e.target.value })}>
-                                            <option value="">No Manager</option>
+                                            <option value="">{tCommon('noManager')}</option>
                                             {employees.map((emp) => (
                                                 <option key={emp.id} value={emp.id}>
                                                     {emp.first_name} {emp.last_name}
@@ -499,27 +502,18 @@ export default function Employees() {
 
                             {/* Compensation & Capacity */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Compensation & Capacity</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('compensationCapacity')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Salary</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('salary')}</label>
                                         <input type="number" step="0.01" placeholder="75000.00" value={formData.salary} onChange={e => setFormData({ ...formData, salary: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hourly Rate</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('hourlyRate')}</label>
                                         <input type="number" step="0.01" placeholder="50.00" value={formData.hourlyRate} onChange={e => setFormData({ ...formData, hourlyRate: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Currency</label>
-                                        <select value={formData.currency} onChange={e => setFormData({ ...formData, currency: e.target.value })}>
-                                            <option value="USD">USD</option>
-                                            <option value="EUR">EUR</option>
-                                            <option value="GBP">GBP</option>
-                                            <option value="ILS">ILS</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Monthly Capacity (hours)</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('monthlyCapacity')}</label>
                                         <input type="number" step="0.01" placeholder="160" value={formData.monthlyCapacity} onChange={e => setFormData({ ...formData, monthlyCapacity: e.target.value })} />
                                     </div>
                                 </div>
@@ -527,14 +521,14 @@ export default function Employees() {
 
                             {/* Experience & Hiring */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Experience & Hiring</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('experienceHiring')}</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Years of Experience</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('yearsOfExperience')}</label>
                                         <input type="number" step="0.1" placeholder="5.5" value={formData.yearsOfExperience} onChange={e => setFormData({ ...formData, yearsOfExperience: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Hire Date</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('hireDate')}</label>
                                         <input type="date" value={formData.hireDate} onChange={e => setFormData({ ...formData, hireDate: e.target.value })} />
                                     </div>
                                 </div>
@@ -542,10 +536,10 @@ export default function Employees() {
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                                 <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} className="btn" style={{ background: '#e2e8f0' }}>
-                                    Cancel
+                                    {tCommon('cancel')}
                                 </button>
                                 <button type="submit" className="btn btn-primary">
-                                    <Plus size={18} /> Add Employee
+                                    <Plus size={18} /> {t('addEmployee')}
                                 </button>
                             </div>
                         </form>

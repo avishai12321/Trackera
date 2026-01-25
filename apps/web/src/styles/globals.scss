@@ -580,3 +580,43 @@ label {
         grid-template-columns: repeat(4, 1fr);
     }
 }
+
+// ============================================
+// RTL (Right-to-Left) Support
+// ============================================
+
+[dir="rtl"] {
+    // Text alignment
+    text-align: right;
+
+    // Tables
+    table th,
+    table td {
+        text-align: right;
+    }
+
+    // Select dropdown arrow position
+    select {
+        background-position: left $spacing-3 center;
+        padding-right: $spacing-3;
+        padding-left: $spacing-10;
+    }
+
+    // Tabs
+    .tabs {
+        &__count {
+            margin-left: 0;
+            margin-right: $spacing-2;
+        }
+    }
+
+    // Modal footer
+    .modal__footer {
+        justify-content: flex-start;
+    }
+
+    // Flex utilities - reverse direction
+    .page-header {
+        flex-direction: row-reverse;
+    }
+}

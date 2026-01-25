@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Plus, Trash2 } from 'lucide-react';
 import { supabase, getCompanySchema, getCurrentUser, insertCompanyTable, deleteCompanyTable } from '@/lib/supabase';
@@ -23,6 +24,8 @@ interface Project {
 
 export default function TimeEntries() {
     const router = useRouter();
+    const t = useTranslations('timeEntries');
+    const tCommon = useTranslations('common');
     const [entries, setEntries] = useState<TimeEntry[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -100,7 +103,7 @@ export default function TimeEntries() {
         e.preventDefault();
 
         if (!employeeId || !tenantId) {
-            alert('Employee or tenant not found. Make sure your user account is linked to an employee record.');
+            alert(t('employeeNotFound'));
             return;
         }
 
@@ -136,63 +139,63 @@ export default function TimeEntries() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete entry?')) return;
+        if (!confirm(t('deleteConfirm'))) return;
         try {
             await deleteCompanyTable('time_entries', id);
             fetchData();
         } catch (err) {
-            alert('Delete failed');
+            alert(t('deleteFailed'));
         }
     };
 
-    if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+    if (loading) return <DashboardLayout><div>{tCommon('loading')}</div></DashboardLayout>;
 
     return (
         <DashboardLayout>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
-                    <h1>Time Entries</h1>
-                    <p style={{ color: '#64748b' }}>Manage your daily work logs.</p>
+                    <h1>{t('title')}</h1>
+                    <p style={{ color: '#64748b' }}>{t('subtitle')}</p>
                 </div>
             </div>
 
             <div className="card" style={{ marginBottom: '2rem' }}>
                 <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Plus size={18} /> New Entry
+                    <Plus size={18} /> {t('newEntry')}
                 </h3>
                 <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1.5rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Project</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('project')}</label>
                             <select value={projectId} onChange={e => setProjectId(e.target.value)} required>
-                                <option value="">Select Project</option>
+                                <option value="">{t('selectProject')}</option>
                                 {projects.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Start Time</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('startTime')}</label>
                             <input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} required />
                         </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '1.5rem' }}>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Duration (min)</label>
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('durationMin')}</label>
                             <input type="number" value={duration} onChange={e => setDuration(e.target.value)} required min="1" />
                         </div>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Description</label>
-                            <input type="text" value={description} onChange={e => setDescription(e.target.value)} required placeholder="What did you work on?" />
+                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('description')}</label>
+                            <input type="text" value={description} onChange={e => setDescription(e.target.value)} required placeholder={t('workPrompt')} />
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', marginTop: '1.8rem' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}>
                                 <input type="checkbox" checked={isBillable} onChange={e => setIsBillable(e.target.checked)} style={{ width: '1rem', height: '1rem' }} />
-                                Billable
+                                {t('billable')}
                             </label>
                         </div>
                     </div>
                     <div>
                         <button className="btn btn-primary" type="submit">
-                            <Plus size={18} /> Add Entry
+                            <Plus size={18} /> {t('addEntry')}
                         </button>
                     </div>
                 </form>
@@ -203,12 +206,12 @@ export default function TimeEntries() {
                     <table>
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Project</th>
-                                <th>Description</th>
-                                <th>Duration</th>
-                                <th>Billable</th>
-                                <th>Actions</th>
+                                <th>{t('date')}</th>
+                                <th>{t('project')}</th>
+                                <th>{t('description')}</th>
+                                <th>{tCommon('duration')}</th>
+                                <th>{t('billable')}</th>
+                                <th>{tCommon('actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -226,7 +229,7 @@ export default function TimeEntries() {
                                             background: e.billable ? '#d1fae5' : '#f3f4f6',
                                             color: e.billable ? '#065f46' : '#374151'
                                         }}>
-                                            {e.billable ? 'Billable' : 'Non-Billable'}
+                                            {e.billable ? t('billable') : t('nonBillable')}
                                         </span>
                                     </td>
                                     <td>
@@ -236,7 +239,7 @@ export default function TimeEntries() {
                                     </td>
                                 </tr>
                             ))}
-                            {entries.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No entries found</td></tr>}
+                            {entries.length === 0 && <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>{t('noEntries')}</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -244,3 +247,4 @@ export default function TimeEntries() {
         </DashboardLayout>
     );
 }
+

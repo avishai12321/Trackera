@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Save, Grid3x3, FolderKanban, ChevronLeft, ChevronRight, Eye, EyeOff, Settings } from 'lucide-react';
 import { supabase, getCompanySchema } from '@/lib/supabase';
@@ -45,6 +46,8 @@ interface MonthlyAvailableHours {
 
 export default function TimeAllocation() {
     const router = useRouter();
+    const t = useTranslations('timeAllocation');
+    const tCommon = useTranslations('common');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [viewMode, setViewMode] = useState<ViewMode>('overview');
@@ -370,7 +373,7 @@ export default function TimeAllocation() {
         }
     };
 
-    if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
+    if (loading) return <DashboardLayout><div>{tCommon('loading')}</div></DashboardLayout>;
 
     const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -378,39 +381,39 @@ export default function TimeAllocation() {
         <DashboardLayout>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
-                    <h1>Time Allocation</h1>
-                    <p style={{ color: '#64748b' }}>Plan resource allocation across projects and months.</p>
+                    <h1>{t('title')}</h1>
+                    <p style={{ color: '#64748b' }}>{t('subtitle')}</p>
                 </div>
                 <button onClick={handleSave} disabled={saving} className="btn btn-primary">
-                    <Save size={18} /> {saving ? 'Saving...' : 'Save Allocations'}
+                    <Save size={18} /> {saving ? tCommon('saving') : t('saveAllocations')}
                 </button>
             </div>
 
             {/* View Mode Selector */}
             <div className="card" style={{ marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <label style={{ fontWeight: 600 }}>View Mode:</label>
+                    <label style={{ fontWeight: 600 }}>{t('viewMode')}:</label>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button
                             onClick={() => setViewMode('overview')}
                             className={viewMode === 'overview' ? 'btn btn-primary' : 'btn'}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                         >
-                            <Grid3x3 size={16} /> Overview Mode
+                            <Grid3x3 size={16} /> {t('overviewMode')}
                         </button>
                         <button
                             onClick={() => setViewMode('project')}
                             className={viewMode === 'project' ? 'btn btn-primary' : 'btn'}
                             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                         >
-                            <FolderKanban size={16} /> Project View Mode
+                            <FolderKanban size={16} /> {t('projectViewMode')}
                         </button>
                     </div>
 
                     {viewMode === 'project' && (
                         <>
                             <div style={{ borderLeft: '2px solid #e2e8f0', height: '2rem', margin: '0 1rem' }}></div>
-                            <label style={{ fontWeight: 600 }}>Select Project:</label>
+                            <label style={{ fontWeight: 600 }}>{t('selectProject')}:</label>
                             <select
                                 value={selectedProjectId}
                                 onChange={e => setSelectedProjectId(e.target.value)}

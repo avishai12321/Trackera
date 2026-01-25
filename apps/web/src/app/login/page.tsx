@@ -2,9 +2,14 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { useTranslations } from 'next-intl';
 import { supabase } from '@/lib/supabase';
 
 export default function Login() {
+    const t = useTranslations('login');
+    const tCommon = useTranslations('common');
+    const tBrand = useTranslations('brand');
+
     const [email, setEmail] = useState('admin@testcompany.com');
     const [password, setPassword] = useState('TestPassword123!');
     const [loading, setLoading] = useState(false);
@@ -78,14 +83,14 @@ export default function Login() {
                         letterSpacing: '0.1em',
                         marginBottom: '4px'
                     }}>
-                        TRACKERA
+                        {tBrand('name')}
                     </h1>
                     <p style={{
                         fontSize: '12px',
                         color: '#64748b',
                         letterSpacing: '0.05em'
                     }}>
-                        TRACK LESS, KNOW MORE
+                        {tBrand('tagline')}
                     </p>
                 </div>
 
@@ -114,13 +119,13 @@ export default function Login() {
                             fontWeight: 500,
                             color: '#334155'
                         }}>
-                            Email
+                            {tCommon('email')}
                         </label>
                         <input
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@company.com"
+                            placeholder={tCommon('emailPlaceholder')}
                             required
                             style={{
                                 width: '100%',
@@ -150,7 +155,7 @@ export default function Login() {
                             fontWeight: 500,
                             color: '#334155'
                         }}>
-                            Password
+                            {tCommon('password')}
                         </label>
                         <input
                             type="password"
@@ -196,10 +201,11 @@ export default function Login() {
                         onMouseEnter={(e) => !loading && (e.currentTarget.style.background = '#4f46e5')}
                         onMouseLeave={(e) => !loading && (e.currentTarget.style.background = '#6366f1')}
                     >
-                        {loading ? 'Signing in...' : 'Sign In'}
+                        {loading ? tCommon('signingIn') : tCommon('signIn')}
                     </button>
                 </form>
             </div>
         </div>
     );
 }
+

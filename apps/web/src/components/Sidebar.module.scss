@@ -17,6 +17,12 @@
     transition: width $transition-smooth;
     overflow: hidden;
 
+    // RTL Support - sidebar on right
+    [dir="rtl"] & {
+        left: auto;
+        right: 0;
+    }
+
     &.collapsed {
         width: 64px;
 
@@ -75,6 +81,12 @@
     &:hover {
         background: $slate-50;
         color: $slate-700;
+    }
+
+    // RTL Support - flip collapse button position
+    [dir="rtl"] & {
+        right: auto;
+        left: -12px;
     }
 }
 
