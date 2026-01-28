@@ -251,7 +251,6 @@ function CompanyOverviewTab() {
             stacked: true,
             animations: {
                 enabled: true,
-                easing: 'easeinout',
                 speed: 800,
             },
             toolbar: { show: false },
@@ -542,7 +541,6 @@ function ProjectViewTab() {
             type: 'donut',
             animations: {
                 enabled: true,
-                easing: 'easeinout',
                 speed: 800,
             },
         },
@@ -591,7 +589,6 @@ function ProjectViewTab() {
             type: 'bar',
             animations: {
                 enabled: true,
-                easing: 'easeinout',
                 speed: 800,
             },
             toolbar: { show: false },
@@ -805,7 +802,6 @@ function EmployeeOverviewTab() {
             type: 'bar',
             animations: {
                 enabled: true,
-                easing: 'easeinout',
                 speed: 800,
             },
             toolbar: { show: false },
@@ -1045,7 +1041,6 @@ function EmployeeDeepDiveTab() {
             type: 'bar',
             animations: {
                 enabled: true,
-                easing: 'easeinout',
                 speed: 800,
             },
             toolbar: { show: false },
