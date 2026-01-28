@@ -87,18 +87,18 @@
   },
   "sidebar": {
     "main": "ראשי",
-    "data": "נתונים",
+    "manager": "מנהל",
+    "admin": "מנהל מערכת",
     "dashboard": "לוח בקרה",
     "employees": "עובדים",
-    "employeeReview": "סקירת עובדים",
     "clients": "לקוחות",
     "projects": "פרויקטים",
     "timeAllocation": "הקצאת זמן",
     "calendar": "יומן",
     "timeEntries": "רישומי שעות",
+    "myReviews": "הסקירות שלי",
     "reports": "דוחות",
-    "importData": "ייבוא נתונים",
-    "draftRecords": "טיוטות"
+    "importData": "ייבוא נתונים"
   },
   "dashboard": {
     "title": "לוח בקרה אנליטי",

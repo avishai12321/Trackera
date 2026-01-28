@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { LayoutDashboard, Clock, Calendar, FolderKanban, LogOut, Upload, FileCheck, Users, Building2, ClipboardList, ChevronLeft, ChevronRight, FileText, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Clock, Calendar, FolderKanban, LogOut, Upload, Users, Building2, ClipboardList, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import styles from './Sidebar.module.scss';
 import clsx from 'clsx';
 import { useRouter } from 'next/navigation';
@@ -11,19 +11,21 @@ import { signOut } from '@/lib/supabase';
 
 const mainMenuKeys = [
     { key: 'dashboard', icon: LayoutDashboard, href: '/dashboard' },
+    { key: 'calendar', icon: Calendar, href: '/calendar' },
+    { key: 'timeEntries', icon: Clock, href: '/time-entries' },
+    { key: 'myReviews', icon: ClipboardList, href: '/my-reviews' },
+] as const;
+
+const managerMenuKeys = [
     { key: 'employees', icon: Users, href: '/employees' },
-    { key: 'employeeReview', icon: ClipboardCheck, href: '/employee-reviews' },
     { key: 'clients', icon: Building2, href: '/clients' },
     { key: 'projects', icon: FolderKanban, href: '/projects' },
     { key: 'timeAllocation', icon: ClipboardList, href: '/time-allocation' },
-    { key: 'calendar', icon: Calendar, href: '/calendar' },
 ] as const;
 
-const dataMenuKeys = [
-    { key: 'timeEntries', icon: Clock, href: '/time-entries' },
-    { key: 'reports', icon: FileText, href: '/reports' },
+const adminMenuKeys = [
     { key: 'importData', icon: Upload, href: '/import' },
-    { key: 'draftRecords', icon: FileCheck, href: '/drafts' },
+    { key: 'reports', icon: FileText, href: '/reports' },
 ] as const;
 
 interface SidebarProps {
@@ -92,8 +94,28 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                 </div>
 
                 <div className={styles.menuSection}>
-                    <div className={styles.sectionLabel}>{t('data')}</div>
-                    {dataMenuKeys.map((item) => {
+                    <div className={styles.sectionLabel}>{t('manager')}</div>
+                    {managerMenuKeys.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = pathname === item.href;
+                        const name = t(item.key);
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={clsx(styles.link, isActive && styles.active)}
+                                title={collapsed ? name : undefined}
+                            >
+                                <Icon size={18} />
+                                <span>{name}</span>
+                            </Link>
+                        );
+                    })}
+                </div>
+
+                <div className={styles.menuSection}>
+                    <div className={styles.sectionLabel}>{t('admin')}</div>
+                    {adminMenuKeys.map((item) => {
                         const Icon = item.icon;
                         const isActive = pathname === item.href;
                         const name = t(item.key);

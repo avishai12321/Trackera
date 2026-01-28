@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '../../components/DashboardLayout';
-import { Plus, Trash2, Edit2, X, Check } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Check, ClipboardCheck, Download, Star, Pencil } from 'lucide-react';
 import { supabase, getCompanySchema, insertCompanyTable, updateCompanyTable, deleteCompanyTable } from '@/lib/supabase';
+import axios from 'axios';
 
 interface Employee {
     id: string;
@@ -25,6 +26,26 @@ interface Employee {
     manager?: { id: string; first_name: string; last_name: string } | null;
 }
 
+interface EmployeeReview {
+    id: string;
+    employee_id: string;
+    reviewer_id: string;
+    review_date: string;
+    score_presentation: number | null;
+    score_time_management: number | null;
+    score_excel_skills: number | null;
+    score_proficiency: number | null;
+    score_transparency: number | null;
+    score_creativity: number | null;
+    score_overall: number | null;
+    positive_skills: string[];
+    improvement_skills: string[];
+    action_items: string | null;
+    employee_commentary: string | null;
+    employee?: Employee | null;
+    reviewer?: Employee | null;
+}
+
 export default function Employees() {
     const router = useRouter();
     const [employees, setEmployees] = useState<Employee[]>([]);
@@ -33,6 +54,32 @@ export default function Employees() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ACTIVE');
+
+    // Review-related state
+    const [showReviewsModal, setShowReviewsModal] = useState(false);
+    const [selectedEmployeeForReviews, setSelectedEmployeeForReviews] = useState<Employee | null>(null);
+    const [employeeReviews, setEmployeeReviews] = useState<EmployeeReview[]>([]);
+    const [showAddReviewForm, setShowAddReviewForm] = useState(false);
+    const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+    const [tenantId, setTenantId] = useState<string | null>(null);
+    const [reviewFormData, setReviewFormData] = useState({
+        employeeId: '',
+        reviewDate: new Date().toISOString().split('T')[0],
+        scorePresentation: '',
+        scoreTimeManagement: '',
+        scoreExcelSkills: '',
+        scoreProficiency: '',
+        scoreTransparency: '',
+        scoreCreativity: '',
+        scoreOverall: '',
+        positiveSkills: [] as string[],
+        improvementSkills: [] as string[],
+        actionItems: '',
+        employeeCommentary: '',
+    });
+    const [newPositiveSkill, setNewPositiveSkill] = useState('');
+    const [newImprovementSkill, setNewImprovementSkill] = useState('');
+    const [reviewCounts, setReviewCounts] = useState<Record<string, number>>({});
 
     // Form state for adding
     const [formData, setFormData] = useState({
@@ -65,6 +112,9 @@ export default function Employees() {
             if (!session) return router.push('/login');
 
             const schema = await getCompanySchema();
+            const companyId = session.user.user_metadata?.company_id;
+            setTenantId(companyId || null);
+
             const { data, error } = await supabase
                 .schema(schema)
                 .from('employees')
@@ -80,6 +130,20 @@ export default function Employees() {
 
             if (error) throw error;
             setEmployees(data || []);
+
+            // Fetch review counts for each employee
+            const { data: reviewsData } = await supabase
+                .schema(schema)
+                .from('employee_reviews')
+                .select('employee_id');
+
+            if (reviewsData) {
+                const counts: Record<string, number> = {};
+                reviewsData.forEach(review => {
+                    counts[review.employee_id] = (counts[review.employee_id] || 0) + 1;
+                });
+                setReviewCounts(counts);
+            }
         } catch (err: any) {
             console.error('Error fetching employees:', err);
         } finally {
@@ -219,6 +283,221 @@ export default function Employees() {
         }
     };
 
+    // Review-related handlers
+    const handleOpenReviews = async (employee: Employee) => {
+        setSelectedEmployeeForReviews(employee);
+        setShowReviewsModal(true);
+        await fetchEmployeeReviews(employee.id);
+    };
+
+    const fetchEmployeeReviews = async (employeeId: string) => {
+        try {
+            const schema = await getCompanySchema();
+            const { data: revs, error } = await supabase
+                .schema(schema)
+                .from('employee_reviews')
+                .select('*')
+                .eq('employee_id', employeeId)
+                .order('review_date', { ascending: false });
+
+            if (error) throw error;
+
+            const employeeMap = new Map(employees.map(e => [e.id, e]));
+            const reviewsWithEmployees = (revs || []).map(review => ({
+                ...review,
+                employee: employeeMap.get(review.employee_id) || null,
+                reviewer: employeeMap.get(review.reviewer_id) || null,
+            }));
+
+            setEmployeeReviews(reviewsWithEmployees);
+        } catch (err: any) {
+            console.error('Error fetching reviews:', err);
+        }
+    };
+
+    const resetReviewForm = () => {
+        setReviewFormData({
+            employeeId: selectedEmployeeForReviews?.id || '',
+            reviewDate: new Date().toISOString().split('T')[0],
+            scorePresentation: '',
+            scoreTimeManagement: '',
+            scoreExcelSkills: '',
+            scoreProficiency: '',
+            scoreTransparency: '',
+            scoreCreativity: '',
+            scoreOverall: '',
+            positiveSkills: [],
+            improvementSkills: [],
+            actionItems: '',
+            employeeCommentary: '',
+        });
+        setNewPositiveSkill('');
+        setNewImprovementSkill('');
+    };
+
+    const handleSubmitReview = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+
+        if (!reviewFormData.employeeId) {
+            setError('Please select an employee');
+            return;
+        }
+
+        if (!tenantId) {
+            setError('Tenant ID not found. Please refresh the page.');
+            return;
+        }
+
+        try {
+            const reviewData = {
+                employee_id: reviewFormData.employeeId,
+                review_date: reviewFormData.reviewDate,
+                score_presentation: reviewFormData.scorePresentation ? parseInt(reviewFormData.scorePresentation) : null,
+                score_time_management: reviewFormData.scoreTimeManagement ? parseInt(reviewFormData.scoreTimeManagement) : null,
+                score_excel_skills: reviewFormData.scoreExcelSkills ? parseInt(reviewFormData.scoreExcelSkills) : null,
+                score_proficiency: reviewFormData.scoreProficiency ? parseInt(reviewFormData.scoreProficiency) : null,
+                score_transparency: reviewFormData.scoreTransparency ? parseInt(reviewFormData.scoreTransparency) : null,
+                score_creativity: reviewFormData.scoreCreativity ? parseInt(reviewFormData.scoreCreativity) : null,
+                score_overall: reviewFormData.scoreOverall ? parseInt(reviewFormData.scoreOverall) : null,
+                positive_skills: reviewFormData.positiveSkills,
+                improvement_skills: reviewFormData.improvementSkills,
+                action_items: reviewFormData.actionItems || null,
+                employee_commentary: reviewFormData.employeeCommentary || null,
+            };
+
+            if (editingReviewId) {
+                await updateCompanyTable('employee_reviews', editingReviewId, reviewData);
+            } else {
+                const schema = await getCompanySchema();
+                const { data: { user } } = await supabase.auth.getUser();
+                const { data: reviewer } = await supabase
+                    .schema(schema)
+                    .from('employees')
+                    .select('id')
+                    .eq('user_id', user?.id)
+                    .single();
+
+                await insertCompanyTable('employee_reviews', {
+                    ...reviewData,
+                    tenant_id: tenantId,
+                    reviewer_id: reviewer?.id || null,
+                });
+            }
+
+            resetReviewForm();
+            setEditingReviewId(null);
+            setShowAddReviewForm(false);
+            if (selectedEmployeeForReviews) {
+                await fetchEmployeeReviews(selectedEmployeeForReviews.id);
+            }
+            fetchData();
+        } catch (err: any) {
+            setError(err.message || (editingReviewId ? 'Failed to update review' : 'Failed to create review'));
+        }
+    };
+
+    const handleDeleteReview = async (id: string) => {
+        if (!confirm('Delete this review?')) return;
+        try {
+            await deleteCompanyTable('employee_reviews', id);
+            if (selectedEmployeeForReviews) {
+                await fetchEmployeeReviews(selectedEmployeeForReviews.id);
+            }
+            fetchData();
+        } catch (err: any) {
+            alert('Failed to delete review: ' + err.message);
+        }
+    };
+
+    const handleEditReview = (review: EmployeeReview) => {
+        setEditingReviewId(review.id);
+        setReviewFormData({
+            employeeId: review.employee_id,
+            reviewDate: review.review_date,
+            scorePresentation: review.score_presentation?.toString() || '',
+            scoreTimeManagement: review.score_time_management?.toString() || '',
+            scoreExcelSkills: review.score_excel_skills?.toString() || '',
+            scoreProficiency: review.score_proficiency?.toString() || '',
+            scoreTransparency: review.score_transparency?.toString() || '',
+            scoreCreativity: review.score_creativity?.toString() || '',
+            scoreOverall: review.score_overall?.toString() || '',
+            positiveSkills: review.positive_skills || [],
+            improvementSkills: review.improvement_skills || [],
+            actionItems: review.action_items || '',
+            employeeCommentary: review.employee_commentary || '',
+        });
+        setShowAddReviewForm(true);
+    };
+
+    const handleDownloadPdf = async (reviewId: string) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return router.push('/login');
+
+        const token = session.access_token;
+        const tenantIdValue = session.user.user_metadata?.company_id;
+
+        try {
+            const response = await axios.get(`http://localhost:3000/employee-reviews/${reviewId}/pdf`, {
+                headers: { Authorization: `Bearer ${token}`, 'x-tenant-id': tenantIdValue },
+                responseType: 'blob'
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `employee-review-${reviewId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (err) {
+            alert('PDF download failed');
+        }
+    };
+
+    const addPositiveSkill = () => {
+        if (newPositiveSkill.trim()) {
+            setReviewFormData({
+                ...reviewFormData,
+                positiveSkills: [...reviewFormData.positiveSkills, newPositiveSkill.trim()]
+            });
+            setNewPositiveSkill('');
+        }
+    };
+
+    const removePositiveSkill = (index: number) => {
+        setReviewFormData({
+            ...reviewFormData,
+            positiveSkills: reviewFormData.positiveSkills.filter((_, i) => i !== index)
+        });
+    };
+
+    const addImprovementSkill = () => {
+        if (newImprovementSkill.trim()) {
+            setReviewFormData({
+                ...reviewFormData,
+                improvementSkills: [...reviewFormData.improvementSkills, newImprovementSkill.trim()]
+            });
+            setNewImprovementSkill('');
+        }
+    };
+
+    const removeImprovementSkill = (index: number) => {
+        setReviewFormData({
+            ...reviewFormData,
+            improvementSkills: reviewFormData.improvementSkills.filter((_, i) => i !== index)
+        });
+    };
+
+    const validateScore = (value: string): string => {
+        if (value === '') return '';
+        const num = parseInt(value);
+        if (isNaN(num)) return '';
+        if (num < 1) return '1';
+        if (num > 100) return '100';
+        return String(num);
+    };
+
     // Filter employees based on status
     const filteredEmployees = statusFilter === 'ALL'
         ? employees
@@ -319,6 +598,7 @@ export default function Employees() {
                                     <th>Capacity</th>
                                     <th>Hire Date</th>
                                     <th>Status</th>
+                                    <th>Previous Reviews</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -427,6 +707,17 @@ export default function Employees() {
                                                             <option value="INACTIVE">INACTIVE</option>
                                                         </select>
                                                     </td>
+                                                    <td>
+                                                        <button
+                                                            onClick={() => handleOpenReviews(employee)}
+                                                            className="btn"
+                                                            style={{ padding: '0.25rem 0.75rem', background: '#6366f1', color: 'white', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem' }}
+                                                            title="View Reviews"
+                                                        >
+                                                            <ClipboardCheck size={14} />
+                                                            {reviewCounts[employee.id] || 0}
+                                                        </button>
+                                                    </td>
                                                 </>
                                             ) : (
                                                 <>
@@ -463,6 +754,17 @@ export default function Employees() {
                                                     }}>
                                                         {employee.status}
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    <button
+                                                        onClick={() => handleOpenReviews(employee)}
+                                                        className="btn"
+                                                        style={{ padding: '0.25rem 0.75rem', background: '#6366f1', color: 'white', display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem' }}
+                                                        title="View Reviews"
+                                                    >
+                                                        <ClipboardCheck size={14} />
+                                                        {reviewCounts[employee.id] || 0}
+                                                    </button>
                                                 </td>
                                                 </>
                                             )}
@@ -622,6 +924,404 @@ export default function Employees() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Employee Reviews Modal */}
+            {showReviewsModal && selectedEmployeeForReviews && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '8px',
+                        padding: '2rem',
+                        maxWidth: '1200px',
+                        width: '95%',
+                        maxHeight: '90vh',
+                        overflowY: 'auto',
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <ClipboardCheck size={20} />
+                                Reviews for {selectedEmployeeForReviews.first_name} {selectedEmployeeForReviews.last_name}
+                            </h3>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                {!showAddReviewForm && (
+                                    <button
+                                        onClick={() => {
+                                            resetReviewForm();
+                                            setReviewFormData({ ...reviewFormData, employeeId: selectedEmployeeForReviews.id });
+                                            setShowAddReviewForm(true);
+                                        }}
+                                        className="btn btn-primary"
+                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem' }}
+                                    >
+                                        <Plus size={16} /> New Review
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => {
+                                        setShowReviewsModal(false);
+                                        setSelectedEmployeeForReviews(null);
+                                        setShowAddReviewForm(false);
+                                        setEditingReviewId(null);
+                                    }}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                                >
+                                    <X size={24} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {showAddReviewForm ? (
+                            // Review Form
+                            <>
+                                {error && <p style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.875rem' }}>{String(error)}</p>}
+                                <form onSubmit={handleSubmitReview} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                    <div>
+                                        <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Review Information</h4>
+                                        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Review Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={reviewFormData.reviewDate}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, reviewDate: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Performance Scores (1-100)</h4>
+                                        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Presentation</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    placeholder="1-100"
+                                                    value={reviewFormData.scorePresentation}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, scorePresentation: validateScore(e.target.value) })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Time Management</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    placeholder="1-100"
+                                                    value={reviewFormData.scoreTimeManagement}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, scoreTimeManagement: validateScore(e.target.value) })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Excel Skills</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    placeholder="1-100"
+                                                    value={reviewFormData.scoreExcelSkills}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, scoreExcelSkills: validateScore(e.target.value) })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Proficiency</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    placeholder="1-100"
+                                                    value={reviewFormData.scoreProficiency}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, scoreProficiency: validateScore(e.target.value) })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Transparency</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    placeholder="1-100"
+                                                    value={reviewFormData.scoreTransparency}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, scoreTransparency: validateScore(e.target.value) })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Creativity</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    placeholder="1-100"
+                                                    value={reviewFormData.scoreCreativity}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, scoreCreativity: validateScore(e.target.value) })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Overall</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    placeholder="1-100"
+                                                    value={reviewFormData.scoreOverall}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, scoreOverall: validateScore(e.target.value) })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Overall Review</h4>
+                                        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#16a34a' }}>Positive Skills</label>
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Add a positive skill..."
+                                                        value={newPositiveSkill}
+                                                        onChange={e => setNewPositiveSkill(e.target.value)}
+                                                        onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addPositiveSkill())}
+                                                        style={{ flex: 1 }}
+                                                    />
+                                                    <button type="button" onClick={addPositiveSkill} className="btn" style={{ background: '#16a34a', color: 'white', padding: '0.5rem' }}>
+                                                        <Plus size={16} />
+                                                    </button>
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                    {reviewFormData.positiveSkills.map((skill, index) => (
+                                                        <span key={index} style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.25rem',
+                                                            padding: '4px 8px',
+                                                            background: '#dcfce7',
+                                                            color: '#166534',
+                                                            borderRadius: '999px',
+                                                            fontSize: '0.875rem'
+                                                        }}>
+                                                            {skill}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removePositiveSkill(index)}
+                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500, color: '#dc2626' }}>Areas for Improvement</label>
+                                                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Add an improvement area..."
+                                                        value={newImprovementSkill}
+                                                        onChange={e => setNewImprovementSkill(e.target.value)}
+                                                        onKeyPress={e => e.key === 'Enter' && (e.preventDefault(), addImprovementSkill())}
+                                                        style={{ flex: 1 }}
+                                                    />
+                                                    <button type="button" onClick={addImprovementSkill} className="btn" style={{ background: '#dc2626', color: 'white', padding: '0.5rem' }}>
+                                                        <Plus size={16} />
+                                                    </button>
+                                                </div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                    {reviewFormData.improvementSkills.map((skill, index) => (
+                                                        <span key={index} style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.25rem',
+                                                            padding: '4px 8px',
+                                                            background: '#fee2e2',
+                                                            color: '#dc2626',
+                                                            borderRadius: '999px',
+                                                            fontSize: '0.875rem'
+                                                        }}>
+                                                            {skill}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeImprovementSkill(index)}
+                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Additional Notes</h4>
+                                        <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' }}>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Action Items</label>
+                                                <textarea
+                                                    placeholder="Enter action items for the employee..."
+                                                    value={reviewFormData.actionItems}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, actionItems: e.target.value })}
+                                                    rows={4}
+                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Employee Commentary</label>
+                                                <textarea
+                                                    placeholder="Enter employee's comments or feedback..."
+                                                    value={reviewFormData.employeeCommentary}
+                                                    onChange={e => setReviewFormData({ ...reviewFormData, employeeCommentary: e.target.value })}
+                                                    rows={4}
+                                                    style={{ width: '100%', resize: 'vertical' }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowAddReviewForm(false);
+                                                setEditingReviewId(null);
+                                                resetReviewForm();
+                                            }}
+                                            className="btn"
+                                            style={{ background: '#e2e8f0' }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button type="submit" className="btn btn-primary">
+                                            {editingReviewId ? <Pencil size={18} /> : <Plus size={18} />}
+                                            {editingReviewId ? ' Update Review' : ' Create Review'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </>
+                        ) : (
+                            // Reviews List
+                            <div>
+                                {employeeReviews.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                                        <p>No reviews yet for this employee.</p>
+                                    </div>
+                                ) : (
+                                    <div style={{ overflowX: 'auto', width: '100%' }}>
+                                        <table style={{ width: '100%' }}>
+                                            <thead>
+                                                <tr>
+                                                    <th>Date</th>
+                                                    <th>Overall Score</th>
+                                                    <th>Reviewer</th>
+                                                    <th>Positive Skills</th>
+                                                    <th>Improvement Areas</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {employeeReviews.map((review) => (
+                                                    <tr key={review.id}>
+                                                        <td>{new Date(review.review_date).toLocaleDateString()}</td>
+                                                        <td>
+                                                            <span style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.25rem',
+                                                                padding: '2px 8px',
+                                                                borderRadius: '999px',
+                                                                background: review.score_overall && review.score_overall >= 70 ? '#dcfce7' : '#fef9c3',
+                                                                color: review.score_overall && review.score_overall >= 70 ? '#166534' : '#854d0e'
+                                                            }}>
+                                                                <Star size={14} /> {review.score_overall || 'N/A'}
+                                                            </span>
+                                                        </td>
+                                                        <td>{review.reviewer?.first_name} {review.reviewer?.last_name}</td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', maxWidth: '200px' }}>
+                                                                {review.positive_skills?.slice(0, 2).map((skill, i) => (
+                                                                    <span key={i} style={{
+                                                                        padding: '2px 6px',
+                                                                        background: '#dcfce7',
+                                                                        color: '#166534',
+                                                                        borderRadius: '999px',
+                                                                        fontSize: '0.75rem'
+                                                                    }}>{skill}</span>
+                                                                ))}
+                                                                {review.positive_skills && review.positive_skills.length > 2 && (
+                                                                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>+{review.positive_skills.length - 2}</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', maxWidth: '200px' }}>
+                                                                {review.improvement_skills?.slice(0, 2).map((skill, i) => (
+                                                                    <span key={i} style={{
+                                                                        padding: '2px 6px',
+                                                                        background: '#fee2e2',
+                                                                        color: '#dc2626',
+                                                                        borderRadius: '999px',
+                                                                        fontSize: '0.75rem'
+                                                                    }}>{skill}</span>
+                                                                ))}
+                                                                {review.improvement_skills && review.improvement_skills.length > 2 && (
+                                                                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>+{review.improvement_skills.length - 2}</span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                                                <button
+                                                                    onClick={() => handleEditReview(review)}
+                                                                    className="btn"
+                                                                    style={{ padding: '0.25rem 0.5rem', background: '#f59e0b', color: 'white' }}
+                                                                    title="Edit Review"
+                                                                >
+                                                                    <Pencil size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDownloadPdf(review.id)}
+                                                                    className="btn"
+                                                                    style={{ padding: '0.25rem 0.5rem', background: '#3b82f6', color: 'white' }}
+                                                                    title="Download PDF"
+                                                                >
+                                                                    <Download size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteReview(review.id)}
+                                                                    className="btn btn-danger"
+                                                                    style={{ padding: '0.25rem 0.5rem' }}
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

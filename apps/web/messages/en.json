@@ -87,18 +87,18 @@
   },
   "sidebar": {
     "main": "Main",
-    "data": "Data",
+    "manager": "Manager",
+    "admin": "Admin",
     "dashboard": "Dashboard",
     "employees": "Employees",
-    "employeeReview": "Employee Review",
     "clients": "Clients",
     "projects": "Projects",
     "timeAllocation": "Time Allocation",
     "calendar": "Calendar",
     "timeEntries": "Time Entries",
+    "myReviews": "My Reviews",
     "reports": "Reports",
-    "importData": "Import Data",
-    "draftRecords": "Draft Records"
+    "importData": "Import Data"
   },
   "dashboard": {
     "title": "Analytics Dashboard",
