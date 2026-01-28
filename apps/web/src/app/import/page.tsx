@@ -53,7 +53,12 @@ export default function Import() {
     };
 
     const handleUpload = async () => {
-        if (!file) return;
+        if (!file) {
+            console.error('No file selected');
+            return;
+        }
+
+        console.log('File to upload:', file.name, file.size, 'bytes', file.type);
 
         setLoading(true);
         setError('');
@@ -73,12 +78,19 @@ export default function Import() {
 
             const formData = new FormData();
             formData.append('file', file);
+            console.log('FormData created, file appended');
+            console.log('FormData entries:', Array.from(formData.entries()).map(([key, value]) => ({
+                key,
+                value: value instanceof File ? `File: ${value.name} (${value.size} bytes)` : value
+            })));
 
+            // IMPORTANT: Do NOT set Content-Type header - let browser set it automatically with boundary
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}/import/excel`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${session.access_token}`,
                     'x-tenant-id': tenantId,
+                    // Content-Type is automatically set by browser for FormData
                 },
                 body: formData,
             });
@@ -190,7 +202,8 @@ export default function Import() {
                         <div style={{ background: 'white', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                             <strong style={{ color: '#6366f1' }}>Sheet 4: time_entries</strong>
                             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                                date, employee, project_key, hours, minutes, description
+                                date, employee, project_key, hours, minutes<br/>
+                                <em>Optional:</em> start_time, end_time, description, billable
                             </p>
                         </div>
                     </div>

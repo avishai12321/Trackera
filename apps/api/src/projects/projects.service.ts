@@ -64,12 +64,48 @@ export class ProjectsService {
     }
 
     async remove(id: string, tenantId: string) {
-        const { error } = await this.supabase.getClientForTenant(tenantId)
+        const client = this.supabase.getClientForTenant(tenantId);
+
+        // First, delete all time entries associated with this project
+        const { error: timeEntriesError } = await client
+            .from('time_entries')
+            .delete()
+            .eq('project_id', id);
+
+        if (timeEntriesError) {
+            throw new Error(`Failed to delete time entries: ${timeEntriesError.message}`);
+        }
+
+        // Delete time allocations (should cascade but we do it explicitly to be safe)
+        const { error: timeAllocationsError } = await client
+            .from('time_allocations')
+            .delete()
+            .eq('project_id', id);
+
+        if (timeAllocationsError) {
+            throw new Error(`Failed to delete time allocations: ${timeAllocationsError.message}`);
+        }
+
+        // Delete project budgets (should cascade but we do it explicitly to be safe)
+        const { error: projectBudgetsError } = await client
+            .from('project_budgets')
+            .delete()
+            .eq('project_id', id);
+
+        if (projectBudgetsError) {
+            throw new Error(`Failed to delete project budgets: ${projectBudgetsError.message}`);
+        }
+
+        // Finally, delete the project itself
+        const { error: projectError } = await client
             .from('projects')
             .delete()
             .eq('id', id);
 
-        if (error) throw new Error(`Failed to delete project: ${error.message}`);
+        if (projectError) {
+            throw new Error(`Failed to delete project: ${projectError.message}`);
+        }
+
         return { success: true };
     }
 }

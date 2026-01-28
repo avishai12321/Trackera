@@ -214,7 +214,7 @@ export default function TimeEntries() {
                         <tbody>
                             {entries.map((e: any) => (
                                 <tr key={e.id}>
-                                    <td>{new Date(e.start_time).toLocaleDateString()}</td>
+                                    <td>{e.date ? new Date(e.date).toLocaleDateString() : 'Invalid Date'}</td>
                                     <td style={{ fontWeight: 500, color: '#4338ca' }}>{projects.find((p: Project) => p.id === e.project_id)?.name || 'Unknown'}</td>
                                     <td>{e.description || '-'}</td>
                                     <td>{e.minutes}m</td>

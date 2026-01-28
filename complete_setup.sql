@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS employees (
     monthly_capacity DECIMAL(10,2) DEFAULT 160.00,
     years_of_experience DECIMAL(4,1),
     hire_date DATE,
+    first_report_date DATE,
+    last_report_date DATE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT employees_pkey PRIMARY KEY (id)
