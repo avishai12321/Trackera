@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Plus, Trash2, Edit2, X, Check } from 'lucide-react';
 import { supabase, getCompanySchema, insertCompanyTable, updateCompanyTable, deleteCompanyTable } from '@/lib/supabase';
@@ -38,15 +37,16 @@ interface Employee {
 
 export default function Projects() {
     const router = useRouter();
-    const t = useTranslations('projects');
-    const tCommon = useTranslations('common');
     const [projects, setProjects] = useState<Project[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showAddForm, setShowAddForm] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'ARCHIVED'>('ACTIVE');
 
     // Form state for adding
     const [formData, setFormData] = useState({
@@ -65,8 +65,8 @@ export default function Projects() {
         endDate: '',
     });
 
-    // Edit state
-    const [editData, setEditData] = useState<Partial<Project>>({});
+    // Edit state - now stores all project edits by ID
+    const [editData, setEditData] = useState<Record<string, Partial<Project>>>({});
 
     useEffect(() => {
         fetchData();
@@ -181,289 +181,378 @@ export default function Projects() {
         }
     };
 
-    const startEdit = (project: Project) => {
-        setEditingId(project.id);
-        setEditData({
-            name: project.name,
-            code: project.code,
-            description: project.description,
-            client_id: project.client_id,
-            manager_id: project.manager_id,
-            budget_type: project.budget_type,
-            total_budget: project.total_budget,
-            hourly_rate: project.hourly_rate,
-            estimated_hours: project.estimated_hours,
-            currency: project.currency,
-            start_date: project.start_date,
-            end_date: project.end_date,
-            status: project.status,
-        });
-    };
-
-    const cancelEdit = () => {
-        setEditingId(null);
-        setEditData({});
-    };
-
-    const saveEdit = async (id: string) => {
-        try {
-            await updateCompanyTable('projects', id, {
-                name: editData.name,
-                code: editData.code || null,
-                description: editData.description || null,
-                client_id: editData.client_id || null,
-                manager_id: editData.manager_id || null,
-                budget_type: editData.budget_type || 'FIXED',
-                total_budget: (editData.budget_type === 'FIXED' || editData.budget_type === 'MONTHLY_RATE') ? editData.total_budget : null,
-                hourly_rate: editData.budget_type === 'HOURLY_RATE' ? editData.hourly_rate : null,
-                estimated_hours: editData.budget_type === 'HOURLY_RATE' ? editData.estimated_hours : null,
-                currency: editData.currency || 'USD',
-                start_date: editData.start_date || null,
-                end_date: editData.end_date || null,
-                status: editData.status || 'ACTIVE',
+    const toggleEditMode = () => {
+        if (isEditMode) {
+            // Exiting edit mode - clear all edits
+            setEditData({});
+        } else {
+            // Entering edit mode - initialize editData with all current project values
+            const initialEditData: Record<string, Partial<Project>> = {};
+            projects.forEach((project) => {
+                initialEditData[project.id] = {
+                    name: project.name,
+                    code: project.code,
+                    description: project.description,
+                    client_id: project.client_id,
+                    manager_id: project.manager_id,
+                    budget_type: project.budget_type,
+                    total_budget: project.total_budget,
+                    hourly_rate: project.hourly_rate,
+                    estimated_hours: project.estimated_hours,
+                    currency: project.currency,
+                    start_date: project.start_date,
+                    end_date: project.end_date,
+                    status: project.status,
+                };
             });
-            setEditingId(null);
+            setEditData(initialEditData);
+        }
+        setIsEditMode(!isEditMode);
+    };
+
+    const saveAllEdits = async () => {
+        try {
+            // Save all edited projects
+            for (const [id, data] of Object.entries(editData)) {
+                await updateCompanyTable('projects', id, {
+                    name: data.name,
+                    code: data.code || null,
+                    description: data.description || null,
+                    client_id: data.client_id || null,
+                    manager_id: data.manager_id || null,
+                    budget_type: data.budget_type || 'FIXED',
+                    total_budget: (data.budget_type === 'FIXED' || data.budget_type === 'MONTHLY_RATE') ? data.total_budget : null,
+                    hourly_rate: data.budget_type === 'HOURLY_RATE' ? data.hourly_rate : null,
+                    estimated_hours: data.budget_type === 'HOURLY_RATE' ? data.estimated_hours : null,
+                    currency: data.currency || 'USD',
+                    start_date: data.start_date || null,
+                    end_date: data.end_date || null,
+                    status: data.status || 'ACTIVE',
+                });
+            }
+            setIsEditMode(false);
             setEditData({});
             fetchData();
         } catch (err: any) {
-            alert('Failed to update project: ' + err.message);
+            alert('Failed to update projects: ' + err.message);
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm(t('deleteConfirm'))) return;
+    const updateProjectField = (id: string, field: keyof Project, value: any) => {
+        setEditData((prev) => ({
+            ...prev,
+            [id]: {
+                ...prev[id],
+                [field]: value,
+            },
+        }));
+    };
+
+    const handleDeleteClick = (id: string) => {
+        setProjectToDelete(id);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!projectToDelete) return;
 
         try {
-            await deleteCompanyTable('projects', id);
+            console.log('Starting project deletion:', projectToDelete);
+            await deleteCompanyTable('projects', projectToDelete);
+            console.log('Project deleted successfully');
+            setShowDeleteModal(false);
+            setProjectToDelete(null);
             fetchData();
         } catch (err: any) {
-            alert('Cannot delete project: it may have associated time entries.');
+            console.error('Error deleting project:', err);
+            alert(`Cannot delete project: ${err.message || 'Unknown error'}`);
+            setShowDeleteModal(false);
+            setProjectToDelete(null);
         }
     };
 
-    if (loading) return <DashboardLayout><div>{tCommon('loading')}</div></DashboardLayout>;
+    const handleDeleteCancel = () => {
+        setShowDeleteModal(false);
+        setProjectToDelete(null);
+    };
+
+    // Filter projects based on status
+    const filteredProjects = statusFilter === 'ALL'
+        ? projects
+        : projects.filter(proj => proj.status === statusFilter);
+
+    if (loading) return <DashboardLayout><div>Loading...</div></DashboardLayout>;
 
     return (
         <DashboardLayout>
             {/* Header with Add Button */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
-                    <h1>{t('title')}</h1>
-                    <p style={{ color: '#64748b' }}>{t('subtitle')}</p>
+                    <h1>Projects</h1>
+                    <p style={{ color: '#64748b' }}>Manage your organization's projects.</p>
                 </div>
-                <button
-                    onClick={() => setShowAddForm(true)}
-                    className="btn btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                >
-                    <Plus size={18} /> {t('addProject')}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {isEditMode ? (
+                        <>
+                            <button
+                                onClick={saveAllEdits}
+                                className="btn"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#10b981', color: 'white' }}
+                            >
+                                <Check size={18} /> Save All
+                            </button>
+                            <button
+                                onClick={toggleEditMode}
+                                className="btn"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#6b7280', color: 'white' }}
+                            >
+                                <X size={18} /> Cancel
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                onClick={toggleEditMode}
+                                className="btn"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#6366f1', color: 'white' }}
+                            >
+                                <Edit2 size={18} /> Edit Mode
+                            </button>
+                            <button
+                                onClick={() => setShowAddForm(true)}
+                                className="btn btn-primary"
+                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                            >
+                                <Plus size={18} /> Add Project
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
 
             {/* Projects Table - Main Content */}
             <div className="card" style={{ overflow: 'hidden' }}>
-                <h3 style={{ marginBottom: '1rem' }}>{t('allProjects')} ({projects.length})</h3>
-                {projects.length === 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h3 style={{ margin: 0 }}>
+                        {statusFilter === 'ALL' ? 'All Projects' : statusFilter === 'ACTIVE' ? 'Active Projects' : 'Archived Projects'}
+                        {' '}({filteredProjects.length})
+                    </h3>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <label style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>Filter:</label>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value as 'ALL' | 'ACTIVE' | 'ARCHIVED')}
+                            style={{
+                                padding: '0.5rem 0.75rem',
+                                borderRadius: '6px',
+                                border: '1px solid #e2e8f0',
+                                fontSize: '0.875rem',
+                                cursor: 'pointer',
+                                background: 'white'
+                            }}
+                        >
+                            <option value="ACTIVE">Active Only</option>
+                            <option value="ARCHIVED">Archived Only</option>
+                            <option value="ALL">All Projects</option>
+                        </select>
+                    </div>
+                </div>
+                {filteredProjects.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                        <p>{t('noProjects')}</p>
+                        <p>No projects yet. Click "Add Project" to create your first one.</p>
                     </div>
                 ) : (
                     <div style={{ overflowX: 'auto', width: '100%' }}>
                         <table style={{ width: '100%' }}>
                             <thead>
                                 <tr>
-                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>{tCommon('actions')}</th>
-                                    <th>{tCommon('name')}</th>
-                                    <th>{tCommon('code')}</th>
-                                    <th>{t('client')}</th>
-                                    <th>{t('projectManager')}</th>
-                                    <th>{t('budgetType')}</th>
-                                    <th>{t('budget')}</th>
-                                    <th>{t('startDate')}</th>
-                                    <th>{t('endDate')}</th>
-                                    <th>{tCommon('status')}</th>
+                                    <th style={{ position: 'sticky', left: 0, background: '#f8fafc', zIndex: 1 }}>{isEditMode ? 'Delete' : 'Actions'}</th>
+                                    <th>Name</th>
+                                    <th>Code</th>
+                                    <th>Client</th>
+                                    <th>Manager</th>
+                                    <th>Budget Type</th>
+                                    <th>Budget/Rate</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {projects.map((project) => (
-                                    <tr key={project.id}>
-                                        {editingId === project.id ? (
-                                            <>
-                                                <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
-                                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                                        <button onClick={() => saveEdit(project.id)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#10b981', color: 'white' }}>
-                                                            <Check size={14} />
-                                                        </button>
-                                                        <button onClick={cancelEdit} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#6b7280', color: 'white' }}>
-                                                            <X size={14} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <input
-                                                        type="text"
-                                                        value={editData.name || ''}
-                                                        onChange={e => setEditData({ ...editData, name: e.target.value })}
-                                                        style={{ width: '120px', padding: '0.25rem' }}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <input
-                                                        type="text"
-                                                        value={editData.code || ''}
-                                                        onChange={e => setEditData({ ...editData, code: e.target.value })}
-                                                        style={{ width: '60px', padding: '0.25rem' }}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <select
-                                                        value={editData.client_id || ''}
-                                                        onChange={e => setEditData({ ...editData, client_id: e.target.value })}
-                                                        style={{ width: '100px', padding: '0.25rem' }}
-                                                    >
-                                                        <option value="">-</option>
-                                                        {clients.map((c) => (
-                                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                                        ))}
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <select
-                                                        value={editData.manager_id || ''}
-                                                        onChange={e => setEditData({ ...editData, manager_id: e.target.value })}
-                                                        style={{ width: '100px', padding: '0.25rem' }}
-                                                    >
-                                                        <option value="">-</option>
-                                                        {employees.map((emp) => (
-                                                            <option key={emp.id} value={emp.id}>
-                                                                {emp.first_name} {emp.last_name}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <select
-                                                        value={editData.budget_type || 'FIXED'}
-                                                        onChange={e => setEditData({ ...editData, budget_type: e.target.value })}
-                                                        style={{ width: '80px', padding: '0.25rem' }}
-                                                    >
-                                                        <option value="FIXED">Fixed</option>
-                                                        <option value="HOURLY_RATE">Hourly</option>
-                                                        <option value="MONTHLY_RATE">Monthly</option>
-                                                    </select>
-                                                </td>
-                                                <td>
-                                                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                                                        <input
-                                                            type="number"
-                                                            placeholder={editData.budget_type === 'HOURLY_RATE' ? 'Rate' : (editData.budget_type === 'MONTHLY_RATE' ? 'Monthly' : 'Budget')}
-                                                            value={editData.budget_type === 'HOURLY_RATE' ? (editData.hourly_rate || '') : (editData.total_budget || '')}
-                                                            onChange={e => {
-                                                                const val = e.target.value ? parseFloat(e.target.value) : null;
-                                                                if (editData.budget_type === 'HOURLY_RATE') {
-                                                                    setEditData({ ...editData, hourly_rate: val });
-                                                                } else {
-                                                                    setEditData({ ...editData, total_budget: val });
-                                                                }
-                                                            }}
-                                                            style={{ width: '80px', padding: '0.25rem' }}
-                                                        />
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <input
-                                                        type="date"
-                                                        value={editData.start_date || ''}
-                                                        onChange={e => setEditData({ ...editData, start_date: e.target.value })}
-                                                        style={{ width: '120px', padding: '0.25rem' }}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <input
-                                                        type="date"
-                                                        value={editData.end_date || ''}
-                                                        onChange={e => setEditData({ ...editData, end_date: e.target.value })}
-                                                        style={{ width: '120px', padding: '0.25rem' }}
-                                                    />
-                                                </td>
-                                                <td>
-                                                    <select
-                                                        value={editData.status || 'ACTIVE'}
-                                                        onChange={e => setEditData({ ...editData, status: e.target.value })}
-                                                        style={{ width: '80px', padding: '0.25rem' }}
-                                                    >
-                                                        <option value="ACTIVE">ACTIVE</option>
-                                                        <option value="ARCHIVED">ARCHIVED</option>
-                                                    </select>
-                                                </td>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
-                                                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                                        <button onClick={() => startEdit(project)} className="btn" style={{ padding: '0.25rem 0.5rem', background: '#6366f1', color: 'white' }}>
-                                                            <Edit2 size={14} />
-                                                        </button>
-                                                        <button onClick={() => handleDelete(project.id)} className="btn btn-danger" style={{ padding: '0.25rem 0.5rem' }}>
+                                {filteredProjects.map((project) => {
+                                    const projectEdit = editData[project.id] || {};
+                                    return (
+                                        <tr key={project.id}>
+                                            {isEditMode ? (
+                                                <>
+                                                    <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
+                                                        <button onClick={() => handleDeleteClick(project.id)} className="btn btn-danger" style={{ padding: '0.25rem 0.5rem' }}>
                                                             <Trash2 size={14} />
                                                         </button>
-                                                    </div>
-                                                </td>
-                                                <td style={{ fontWeight: 500 }}>{project.name}</td>
-                                                <td>
-                                                    {project.code ? (
-                                                        <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem' }}>
-                                                            {project.code}
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            value={projectEdit.name || ''}
+                                                            onChange={e => updateProjectField(project.id, 'name', e.target.value)}
+                                                            style={{ width: '120px', padding: '0.25rem' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            value={projectEdit.code || ''}
+                                                            onChange={e => updateProjectField(project.id, 'code', e.target.value)}
+                                                            style={{ width: '60px', padding: '0.25rem' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <select
+                                                            value={projectEdit.client_id || ''}
+                                                            onChange={e => updateProjectField(project.id, 'client_id', e.target.value)}
+                                                            style={{ width: '100px', padding: '0.25rem' }}
+                                                        >
+                                                            <option value="">-</option>
+                                                            {clients.map((c) => (
+                                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select
+                                                            value={projectEdit.manager_id || ''}
+                                                            onChange={e => updateProjectField(project.id, 'manager_id', e.target.value)}
+                                                            style={{ width: '100px', padding: '0.25rem' }}
+                                                        >
+                                                            <option value="">-</option>
+                                                            {employees.map((emp) => (
+                                                                <option key={emp.id} value={emp.id}>
+                                                                    {emp.first_name} {emp.last_name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select
+                                                            value={projectEdit.budget_type || 'FIXED'}
+                                                            onChange={e => updateProjectField(project.id, 'budget_type', e.target.value)}
+                                                            style={{ width: '80px', padding: '0.25rem' }}
+                                                        >
+                                                            <option value="FIXED">Fixed</option>
+                                                            <option value="HOURLY_RATE">Hourly</option>
+                                                            <option value="MONTHLY_RATE">Monthly</option>
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                                                            <input
+                                                                type="number"
+                                                                placeholder={projectEdit.budget_type === 'HOURLY_RATE' ? 'Rate' : (projectEdit.budget_type === 'MONTHLY_RATE' ? 'Monthly' : 'Budget')}
+                                                                value={projectEdit.budget_type === 'HOURLY_RATE' ? (projectEdit.hourly_rate || '') : (projectEdit.total_budget || '')}
+                                                                onChange={e => {
+                                                                    const val = e.target.value ? parseFloat(e.target.value) : null;
+                                                                    if (projectEdit.budget_type === 'HOURLY_RATE') {
+                                                                        updateProjectField(project.id, 'hourly_rate', val);
+                                                                    } else {
+                                                                        updateProjectField(project.id, 'total_budget', val);
+                                                                    }
+                                                                }}
+                                                                style={{ width: '80px', padding: '0.25rem' }}
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="date"
+                                                            value={projectEdit.start_date || ''}
+                                                            onChange={e => updateProjectField(project.id, 'start_date', e.target.value)}
+                                                            style={{ width: '120px', padding: '0.25rem' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="date"
+                                                            value={projectEdit.end_date || ''}
+                                                            onChange={e => updateProjectField(project.id, 'end_date', e.target.value)}
+                                                            style={{ width: '120px', padding: '0.25rem' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <select
+                                                            value={projectEdit.status || 'ACTIVE'}
+                                                            onChange={e => updateProjectField(project.id, 'status', e.target.value)}
+                                                            style={{ width: '80px', padding: '0.25rem' }}
+                                                        >
+                                                            <option value="ACTIVE">ACTIVE</option>
+                                                            <option value="ARCHIVED">ARCHIVED</option>
+                                                        </select>
+                                                    </td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <td style={{ position: 'sticky', left: 0, background: 'white', zIndex: 1 }}>
+                                                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                                            <button onClick={() => handleDeleteClick(project.id)} className="btn btn-danger" style={{ padding: '0.25rem 0.5rem' }}>
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ fontWeight: 500 }}>{project.name}</td>
+                                                    <td>
+                                                        {project.code ? (
+                                                            <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                                                {project.code}
+                                                            </span>
+                                                        ) : '-'}
+                                                    </td>
+                                                    <td>{project.client ? project.client.name : '-'}</td>
+                                                    <td>
+                                                        {project.manager ? (
+                                                            <span>{project.manager.first_name} {project.manager.last_name}</span>
+                                                        ) : '-'}
+                                                    </td>
+                                                    <td>
+                                                        <span style={{
+                                                            padding: '2px 8px',
+                                                            borderRadius: '4px',
+                                                            fontSize: '0.75rem',
+                                                            background: project.budget_type === 'FIXED' ? '#eef2ff' : (project.budget_type === 'MONTHLY_RATE' ? '#f0fdf4' : '#fef3c7'),
+                                                            color: project.budget_type === 'FIXED' ? '#4338ca' : (project.budget_type === 'MONTHLY_RATE' ? '#15803d' : '#b45309')
+                                                        }}>
+                                                            {project.budget_type === 'FIXED' ? 'Fixed' : (project.budget_type === 'MONTHLY_RATE' ? 'Monthly' : 'Hourly')}
                                                         </span>
-                                                    ) : '-'}
-                                                </td>
-                                                <td>{project.client ? project.client.name : '-'}</td>
-                                                <td>
-                                                    {project.manager ? (
-                                                        <span>{project.manager.first_name} {project.manager.last_name}</span>
-                                                    ) : '-'}
-                                                </td>
-                                                <td>
-                                                    <span style={{
-                                                        padding: '2px 8px',
-                                                        borderRadius: '4px',
-                                                        fontSize: '0.75rem',
-                                                        background: project.budget_type === 'FIXED' ? '#eef2ff' : (project.budget_type === 'MONTHLY_RATE' ? '#f0fdf4' : '#fef3c7'),
-                                                        color: project.budget_type === 'FIXED' ? '#4338ca' : (project.budget_type === 'MONTHLY_RATE' ? '#15803d' : '#b45309')
-                                                    }}>
-                                                        {project.budget_type === 'FIXED' ? 'Fixed' : (project.budget_type === 'MONTHLY_RATE' ? 'Monthly' : 'Hourly')}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    {project.budget_type === 'FIXED' ? (
-                                                        project.total_budget ? `${project.currency || 'USD'} ${parseFloat(String(project.total_budget)).toLocaleString()}` : '-'
-                                                    ) : project.budget_type === 'MONTHLY_RATE' ? (
-                                                        project.total_budget ? `${project.currency || 'USD'} ${parseFloat(String(project.total_budget)).toLocaleString()}/mo` : '-'
-                                                    ) : (
-                                                        project.hourly_rate ? `${project.currency || 'USD'} ${parseFloat(String(project.hourly_rate)).toFixed(2)}/hr` : '-'
-                                                    )}
-                                                </td>
-                                                <td style={{ fontSize: '0.875rem' }}>
-                                                    {project.start_date ? new Date(project.start_date).toLocaleDateString() : '-'}
-                                                </td>
-                                                <td style={{ fontSize: '0.875rem' }}>
-                                                    {project.end_date ? new Date(project.end_date).toLocaleDateString() : '-'}
-                                                </td>
-                                                <td>
-                                                    <span style={{
-                                                        padding: '2px 8px',
-                                                        borderRadius: '999px',
-                                                        fontSize: '0.75rem',
-                                                        background: project.status === 'ACTIVE' ? '#eef2ff' : '#f3f4f6',
-                                                        color: project.status === 'ACTIVE' ? '#4338ca' : '#4b5563'
-                                                    }}>
-                                                        {project.status}
-                                                    </span>
-                                                </td>
-                                            </>
-                                        )}
-                                    </tr>
-                                ))}
+                                                    </td>
+                                                    <td>
+                                                        {project.budget_type === 'FIXED' ? (
+                                                            project.total_budget ? `${project.currency || 'USD'} ${parseFloat(String(project.total_budget)).toLocaleString()}` : '-'
+                                                        ) : project.budget_type === 'MONTHLY_RATE' ? (
+                                                            project.total_budget ? `${project.currency || 'USD'} ${parseFloat(String(project.total_budget)).toLocaleString()}/mo` : '-'
+                                                        ) : (
+                                                            project.hourly_rate ? `${project.currency || 'USD'} ${parseFloat(String(project.hourly_rate)).toFixed(2)}/hr` : '-'
+                                                        )}
+                                                    </td>
+                                                    <td style={{ fontSize: '0.875rem' }}>
+                                                        {project.start_date ? new Date(project.start_date).toLocaleDateString() : '-'}
+                                                    </td>
+                                                    <td style={{ fontSize: '0.875rem' }}>
+                                                        {project.end_date ? new Date(project.end_date).toLocaleDateString() : '-'}
+                                                    </td>
+                                                    <td>
+                                                        <span style={{
+                                                            padding: '2px 8px',
+                                                            borderRadius: '999px',
+                                                            fontSize: '0.75rem',
+                                                            background: project.status === 'ACTIVE' ? '#eef2ff' : '#f3f4f6',
+                                                            color: project.status === 'ACTIVE' ? '#4338ca' : '#4b5563'
+                                                        }}>
+                                                            {project.status}
+                                                        </span>
+                                                    </td>
+                                                </>
+                                            )}
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -495,7 +584,7 @@ export default function Projects() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                             <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Plus size={18} /> {t('addProject')}
+                                <Plus size={18} /> Add Project
                             </h3>
                             <button onClick={() => { setShowAddForm(false); resetForm(); }} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
                                 <X size={24} />
@@ -507,18 +596,18 @@ export default function Projects() {
                         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                             {/* Basic Information */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('basicInfo')}</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Basic Information</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('name')} *</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Name *</label>
                                         <input type="text" placeholder="Project Name" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('code')}</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Code</label>
                                         <input type="text" placeholder="PRJ-001" value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} />
                                     </div>
                                     <div style={{ gridColumn: '1 / -1' }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{tCommon('description')}</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Description</label>
                                         <input type="text" placeholder="Project description..." value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
                                     </div>
                                 </div>
@@ -526,21 +615,21 @@ export default function Projects() {
 
                             {/* Client & Manager */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('clientManager')}</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Client & Manager</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('client')}</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Client</label>
                                         <select value={formData.clientId} onChange={e => setFormData({ ...formData, clientId: e.target.value })}>
-                                            <option value="">{tCommon('noClient')}</option>
+                                            <option value="">No Client</option>
                                             {clients.map((client) => (
                                                 <option key={client.id} value={client.id}>{client.name}</option>
                                             ))}
                                         </select>
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('projectManager')}</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Project Manager</label>
                                         <select value={formData.managerId} onChange={e => setFormData({ ...formData, managerId: e.target.value })}>
-                                            <option value="">{tCommon('noManager')}</option>
+                                            <option value="">No Manager</option>
                                             {employees.map((emp) => (
                                                 <option key={emp.id} value={emp.id}>{emp.first_name} {emp.last_name}</option>
                                             ))}
@@ -551,21 +640,21 @@ export default function Projects() {
 
                             {/* Budget Configuration */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('budgetConfig')}</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Budget Configuration</h4>
                                 <div style={{ marginBottom: '1rem' }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('budgetType')}</label>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Budget Type</label>
                                     <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                                             <input type="radio" value="FIXED" checked={formData.budgetType === 'FIXED'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
-                                            <span>{tCommon('fixedBudget')}</span>
+                                            <span>Fixed Budget</span>
                                         </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                                             <input type="radio" value="HOURLY_RATE" checked={formData.budgetType === 'HOURLY_RATE'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
-                                            <span>{t('hourlyRate')}</span>
+                                            <span>Hourly Rate</span>
                                         </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
                                             <input type="radio" value="MONTHLY_RATE" checked={formData.budgetType === 'MONTHLY_RATE'} onChange={e => setFormData({ ...formData, budgetType: e.target.value })} />
-                                            <span>{tCommon('monthlyRate')}</span>
+                                            <span>Monthly Rate</span>
                                         </label>
                                     </div>
                                 </div>
@@ -631,14 +720,14 @@ export default function Projects() {
 
                             {/* Timeline */}
                             <div>
-                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>{tCommon('timeline')}</h4>
+                                <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Timeline</h4>
                                 <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('startDate')}</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>Start Date</label>
                                         <input type="date" value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} />
                                     </div>
                                     <div>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>{t('endDate')}</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 500 }}>End Date</label>
                                         <input type="date" value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} />
                                     </div>
                                 </div>
@@ -646,13 +735,84 @@ export default function Projects() {
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                                 <button type="button" onClick={() => { setShowAddForm(false); resetForm(); }} className="btn" style={{ background: '#e2e8f0' }}>
-                                    {tCommon('cancel')}
+                                    Cancel
                                 </button>
                                 <button type="submit" className="btn btn-primary">
-                                    <Plus size={18} /> {t('addProject')}
+                                    <Plus size={18} /> Add Project
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 1000,
+                }}>
+                    <div style={{
+                        background: 'white',
+                        borderRadius: '8px',
+                        padding: '2rem',
+                        maxWidth: '500px',
+                        width: '90%',
+                    }}>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                <Trash2 size={24} style={{ color: '#ef4444' }} />
+                                <h3 style={{ color: '#ef4444', margin: 0 }}>Delete Project</h3>
+                            </div>
+                            <p style={{ color: '#475569', marginBottom: '1rem', lineHeight: '1.6' }}>
+                                Are you sure you want to delete this project?
+                            </p>
+                            <div style={{
+                                background: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderRadius: '6px',
+                                padding: '1rem',
+                                marginBottom: '1rem'
+                            }}>
+                                <p style={{ color: '#991b1b', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.875rem' }}>
+                                    Warning: This action cannot be undone!
+                                </p>
+                                <p style={{ color: '#7f1d1d', fontSize: '0.875rem', lineHeight: '1.5', margin: 0 }}>
+                                    Deleting this project will permanently remove:
+                                </p>
+                                <ul style={{ color: '#7f1d1d', fontSize: '0.875rem', marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem' }}>
+                                    <li>All time allocations associated with this project</li>
+                                    <li>All budget data for this project</li>
+                                    <li>All time entries logged to this project</li>
+                                    <li>The project and all its configuration</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                            <button
+                                onClick={handleDeleteCancel}
+                                className="btn"
+                                style={{ background: '#e2e8f0', color: '#1e293b' }}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDeleteConfirm}
+                                className="btn"
+                                style={{ background: '#ef4444', color: 'white' }}
+                            >
+                                <Trash2 size={18} /> Delete Project
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -28,4 +28,4 @@ export enum SubscriptionStatus { ACTIVE = 'ACTIVE', EXPIRED = 'EXPIRED', ERROR =
 
 export enum ClientStatus { ACTIVE = 'ACTIVE', INACTIVE = 'INACTIVE', ARCHIVED = 'ARCHIVED' }
 
-export enum ProjectBudgetType { FIXED = 'FIXED', HOURLY_RATE = 'HOURLY_RATE' }
+export enum ProjectBudgetType { FIXED = 'FIXED', HOURLY_RATE = 'HOURLY_RATE', MONTHLY_RATE = 'MONTHLY_RATE' }

@@ -26,9 +26,21 @@ export class ImportService {
 
     async importExcel(file: UploadedFile, tenantId: string): Promise<ImportResult> {
         this.logger.log(`Starting Excel import for tenant: ${tenantId}`);
+        this.logger.log(`File info: ${file.originalname}, size: ${file.size} bytes, buffer length: ${file.buffer?.length || 0}`);
+
+        // Validate file buffer
+        if (!file.buffer || file.buffer.length === 0) {
+            throw new Error('File buffer is empty. Please ensure the file was uploaded correctly.');
+        }
 
         // Parse Excel workbook
-        const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: true });
+        let workbook: XLSX.WorkBook;
+        try {
+            workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: true });
+        } catch (error: any) {
+            this.logger.error(`Failed to parse Excel file: ${error.message}`);
+            throw new Error(`Failed to parse Excel file: ${error.message}. Please ensure the file is a valid Excel file.`);
+        }
 
         this.logger.log(`Workbook sheets: ${workbook.SheetNames.join(', ')}`);
 
@@ -36,7 +48,7 @@ export class ImportService {
         const employeesSheet = this.findSheet(workbook, ['employees', 'עובדים'], 0);
         const customersSheet = this.findSheet(workbook, ['customers', 'לקוחות', 'clients'], 1);
         const projectsSheet = this.findSheet(workbook, ['projects', 'פרויקטים'], 2);
-        const timeEntriesSheet = this.findSheet(workbook, ['time_entries', 'time entries', 'דיווחי שעות'], 3);
+        const timeEntriesSheet = this.findSheet(workbook, ['time_entries_import', 'time_entries', 'time entries', 'דיווחי שעות'], 3);
 
         // Convert to JSON
         const employeesData = employeesSheet ? XLSX.utils.sheet_to_json(employeesSheet) : [];
@@ -83,6 +95,9 @@ export class ImportService {
         const clientNameToId = new Map<string, string>();
         const projectKeyToId = new Map<string, string>();
 
+        // Track first and last report dates per employee
+        const employeeReportDates = new Map<string, { firstDate: string | null; lastDate: string | null }>();
+
         // STEP 1: Create Clients first (no dependencies)
         let clientsCreated = 0;
         for (const row of customers) {
@@ -90,6 +105,20 @@ export class ImportService {
                 const name = this.getColumnValue(row, ['name', 'customer', 'Name', 'Customer', 'שם', 'לקוח']);
                 if (!name) {
                     warnings.push(`Skipping customer row: missing name`);
+                    continue;
+                }
+
+                // Check if client already exists
+                const { data: existingClient } = await client
+                    .from('clients')
+                    .select('id, name')
+                    .eq('tenant_id', tenantId)
+                    .eq('name', name.trim())
+                    .single();
+
+                if (existingClient) {
+                    clientNameToId.set(name.toLowerCase().trim(), existingClient.id);
+                    warnings.push(`Client "${name}" already exists, using existing record`);
                     continue;
                 }
 
@@ -123,7 +152,24 @@ export class ImportService {
                 }
 
                 const { firstName, lastName } = this.parseFullName(fullName);
-                const hireDate = this.parseDate(this.getColumnValue(row, ['first_report_date', 'firstReportDate', 'start_date', 'hire_date', 'hireDate', 'תאריך התחלה']));
+                const hireDate = this.parseDate(this.getColumnValue(row, ['hire_date', 'hireDate', 'start_date', 'תאריך התחלה']));
+                const firstReportDate = this.parseDate(this.getColumnValue(row, ['first_report_date', 'firstReportDate', 'תאריך דיווח ראשון']));
+                const lastReportDate = this.parseDate(this.getColumnValue(row, ['last_report_date', 'lastReportDate', 'תאריך דיווח אחרון']));
+
+                // Check if employee already exists
+                const { data: existingEmployee } = await client
+                    .from('employees')
+                    .select('id, first_name, last_name')
+                    .eq('tenant_id', tenantId)
+                    .eq('first_name', firstName)
+                    .eq('last_name', lastName)
+                    .single();
+
+                if (existingEmployee) {
+                    employeeNameToId.set(fullName.toLowerCase().trim(), existingEmployee.id);
+                    warnings.push(`Employee "${fullName}" already exists, using existing record`);
+                    continue;
+                }
 
                 const { data, error } = await client
                     .from('employees')
@@ -132,6 +178,8 @@ export class ImportService {
                         first_name: firstName,
                         last_name: lastName,
                         hire_date: hireDate,
+                        first_report_date: firstReportDate,
+                        last_report_date: lastReportDate,
                         status: 'ACTIVE'
                     })
                     .select('id, first_name, last_name')
@@ -166,6 +214,33 @@ export class ImportService {
                     if (!clientId) {
                         warnings.push(`Project "${projectName}": Client "${customerName}" not found in imported clients`);
                     }
+                }
+
+                // Check if project already exists (by name and optional code)
+                let existingProjectQuery = client
+                    .from('projects')
+                    .select('id, name, code')
+                    .eq('tenant_id', tenantId)
+                    .eq('name', projectName.trim());
+
+                if (projectKey) {
+                    existingProjectQuery = existingProjectQuery.eq('code', projectKey.trim());
+                }
+
+                const { data: existingProject } = await existingProjectQuery.single();
+
+                if (existingProject) {
+                    // Map by project key for time entry lookups
+                    if (projectKey) {
+                        projectKeyToId.set(projectKey.toLowerCase().trim(), existingProject.id);
+                    }
+                    // Also map by full "customer | project" key if available
+                    if (customerName && projectName) {
+                        const fullKey = `${customerName.trim()} | ${projectName.trim()}`.toLowerCase();
+                        projectKeyToId.set(fullKey, existingProject.id);
+                    }
+                    warnings.push(`Project "${projectName}" already exists, using existing record`);
+                    continue;
                 }
 
                 const { data, error } = await client
@@ -205,10 +280,13 @@ export class ImportService {
             try {
                 const employeeName = this.getColumnValue(row, ['employee', 'employeeName', 'employee_name', 'Employee', 'עובד']);
                 const projectKey = this.getColumnValue(row, ['project_key', 'projectKey', 'project_id', 'project', 'Project', 'פרויקט']);
-                const date = this.parseDate(this.getColumnValue(row, ['date', 'Date', 'תאריך']));
+                const dateRaw = this.getColumnValue(row, ['date', 'Date', 'תאריך']);
+                const date = this.parseDate(dateRaw);
+
+                this.logger.debug(`Time entry date parsing: raw=${JSON.stringify(dateRaw)}, parsed=${date}`);
 
                 if (!date) {
-                    errors.push(`Time entry: missing or invalid date`);
+                    errors.push(`Time entry: missing or invalid date (raw value: ${JSON.stringify(dateRaw)})`);
                     continue;
                 }
 
@@ -243,9 +321,16 @@ export class ImportService {
                 }
 
                 const description = this.getColumnValue(row, ['description', 'Description', 'תיאור']) || '';
-                const startTime = this.parseTime(this.getColumnValue(row, ['start_time', 'startTime', 'from', 'משעה']));
-                const endTime = this.parseTime(this.getColumnValue(row, ['end_time', 'endTime', 'to', 'עד']));
+                const startTimeRaw = this.parseTime(this.getColumnValue(row, ['start_time', 'startTime', 'from', 'משעה']));
+                const endTimeRaw = this.parseTime(this.getColumnValue(row, ['end_time', 'endTime', 'to', 'עד']));
                 const billable = this.getColumnValue(row, ['billable', 'Billable']);
+
+                // If no start_time is provided, use midnight (00:00:00) as default
+                // This allows time entries with just date + duration
+                const startTime = startTimeRaw || '00:00:00';
+                const endTime = endTimeRaw || null;
+
+                this.logger.debug(`Time entry: date=${date}, startTime=${startTime}, endTime=${endTime}, minutes=${totalMinutes}`);
 
                 const { error } = await client
                     .from('time_entries')
@@ -265,8 +350,44 @@ export class ImportService {
 
                 if (error) throw error;
                 timeEntriesCreated++;
+
+                // Track first and last report dates for this employee
+                if (employeeId && date) {
+                    const existing = employeeReportDates.get(employeeId);
+                    if (!existing) {
+                        employeeReportDates.set(employeeId, { firstDate: date, lastDate: date });
+                    } else {
+                        // Update first date if this date is earlier
+                        if (!existing.firstDate || date < existing.firstDate) {
+                            existing.firstDate = date;
+                        }
+                        // Update last date if this date is later
+                        if (!existing.lastDate || date > existing.lastDate) {
+                            existing.lastDate = date;
+                        }
+                    }
+                }
             } catch (err: any) {
                 errors.push(`Time entry: ${err.message}`);
+            }
+        }
+
+        // STEP 5: Update employees with first and last report dates
+        for (const [employeeId, dates] of employeeReportDates.entries()) {
+            try {
+                const { error } = await client
+                    .from('employees')
+                    .update({
+                        first_report_date: dates.firstDate,
+                        last_report_date: dates.lastDate
+                    })
+                    .eq('id', employeeId)
+                    .eq('tenant_id', tenantId);
+
+                if (error) throw error;
+                this.logger.log(`Updated report dates for employee ${employeeId}: ${dates.firstDate} to ${dates.lastDate}`);
+            } catch (err: any) {
+                warnings.push(`Failed to update report dates for employee ${employeeId}: ${err.message}`);
             }
         }
 
@@ -306,35 +427,62 @@ export class ImportService {
     private parseDate(value: any): string | null {
         if (!value) return null;
 
+        this.logger.debug(`parseDate: type=${typeof value}, value=${value}, isDate=${value instanceof Date}`);
+
         // If it's already a Date object (cellDates: true)
         if (value instanceof Date) {
-            return value.toISOString().split('T')[0];
+            if (isNaN(value.getTime())) {
+                this.logger.warn(`parseDate: Invalid Date object`);
+                return null;
+            }
+            const result = value.toISOString().split('T')[0];
+            this.logger.debug(`parseDate: Date object converted to ${result}`);
+            return result;
         }
 
         // If it's a string, try to parse
         if (typeof value === 'string') {
-            // Try ISO format first
-            const isoDate = new Date(value);
+            const trimmed = value.trim();
+
+            // Try ISO format first (YYYY-MM-DD)
+            if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+                return trimmed;
+            }
+
+            // Try parsing as date string
+            const isoDate = new Date(trimmed);
             if (!isNaN(isoDate.getTime())) {
                 return isoDate.toISOString().split('T')[0];
             }
 
             // Try DD/MM/YYYY format (common in Hebrew/European locales)
-            const ddmmyyyy = value.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            const ddmmyyyy = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
             if (ddmmyyyy) {
                 const [, day, month, year] = ddmmyyyy;
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+
+            // Try MM/DD/YYYY format (US format)
+            const mmddyyyy = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+            if (mmddyyyy) {
+                const [, month, day, year] = mmddyyyy;
                 return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
             }
         }
 
         // If it's an Excel serial date number
         if (typeof value === 'number') {
-            const excelDate = XLSX.SSF.parse_date_code(value);
-            if (excelDate) {
-                return `${excelDate.y}-${String(excelDate.m).padStart(2, '0')}-${String(excelDate.d).padStart(2, '0')}`;
+            try {
+                const excelDate = XLSX.SSF.parse_date_code(value);
+                if (excelDate && excelDate.y && excelDate.m && excelDate.d) {
+                    return `${excelDate.y}-${String(excelDate.m).padStart(2, '0')}-${String(excelDate.d).padStart(2, '0')}`;
+                }
+            } catch (err) {
+                this.logger.warn(`parseDate: Failed to parse Excel date number ${value}`);
             }
         }
 
+        this.logger.warn(`parseDate: Could not parse value: ${JSON.stringify(value)}`);
         return null;
     }
 

@@ -1,5 +1,6 @@
 import { Module, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { MulterModule } from '@nestjs/platform-express';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { SharedModule } from './shared/shared.module';
@@ -17,6 +18,9 @@ import { ImportModule } from './import/import.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    MulterModule.register({
+      dest: './uploads', // temporary upload directory
+    }),
     SharedModule,
     UsersModule,
     AuthModule,
