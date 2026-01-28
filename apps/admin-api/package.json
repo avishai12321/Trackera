@@ -1,0 +1,32 @@
+{
+    "name": "admin-api",
+    "version": "0.0.1",
+    "description": "Local admin API for user management",
+    "private": true,
+    "scripts": {
+        "build": "nest build",
+        "dev": "nest start --watch",
+        "start": "nest start",
+        "start:dev": "nest start --watch",
+        "start:prod": "node dist/main"
+    },
+    "dependencies": {
+        "@nestjs/common": "^11.0.1",
+        "@nestjs/config": "^4.0.2",
+        "@nestjs/core": "^11.0.1",
+        "@nestjs/platform-express": "^11.0.1",
+        "@supabase/supabase-js": "^2.90.1",
+        "bcrypt": "^6.0.0",
+        "reflect-metadata": "^0.2.2",
+        "rxjs": "^7.8.1"
+    },
+    "devDependencies": {
+        "@nestjs/cli": "^11.0.0",
+        "@nestjs/schematics": "^11.0.0",
+        "@types/bcrypt": "^6.0.0",
+        "@types/express": "^5.0.0",
+        "@types/node": "^22.10.7",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.7.3"
+    }
+}

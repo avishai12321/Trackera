@@ -1,0 +1,380 @@
+@use 'variables' as *;
+
+// CSS Reset & Base
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    font-family: $font-family;
+    background-color: $bg-body;
+    color: $slate-900;
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+// Layout
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: $spacing-6;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $spacing-6;
+
+    h1 {
+        font-size: $text-2xl;
+        font-weight: $font-bold;
+        color: $slate-900;
+    }
+}
+
+// Cards
+.card {
+    background: $bg-surface;
+    border-radius: $radius-xl;
+    box-shadow: $shadow-sm;
+    border: 1px solid $slate-200;
+    overflow: hidden;
+}
+
+// Tables
+.table-wrapper {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+
+    th,
+    td {
+        padding: $spacing-3 $spacing-4;
+        text-align: left;
+        border-bottom: 1px solid $slate-200;
+    }
+
+    th {
+        font-size: $text-xs;
+        font-weight: $font-semibold;
+        color: $slate-500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background: $slate-50;
+    }
+
+    td {
+        font-size: $text-sm;
+        color: $slate-700;
+    }
+
+    tbody tr:hover {
+        background: $slate-50;
+    }
+
+    tbody tr:last-child td {
+        border-bottom: none;
+    }
+}
+
+// Buttons
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: $spacing-2;
+    padding: $spacing-2 $spacing-4;
+    font-size: $text-sm;
+    font-weight: $font-medium;
+    border-radius: $radius-md;
+    border: none;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    &.btn-primary {
+        background: $primary-600;
+        color: white;
+
+        &:hover:not(:disabled) {
+            background: $primary-700;
+        }
+    }
+
+    &.btn-secondary {
+        background: $slate-100;
+        color: $slate-700;
+        border: 1px solid $slate-300;
+
+        &:hover:not(:disabled) {
+            background: $slate-200;
+        }
+    }
+
+    &.btn-danger {
+        background: $danger-500;
+        color: white;
+
+        &:hover:not(:disabled) {
+            background: $danger-600;
+        }
+    }
+
+    &.btn-ghost {
+        background: transparent;
+        color: $slate-600;
+
+        &:hover:not(:disabled) {
+            background: $slate-100;
+        }
+    }
+
+    &.btn-sm {
+        padding: $spacing-1 $spacing-2;
+        font-size: $text-xs;
+    }
+
+    &.btn-icon {
+        padding: $spacing-2;
+        width: 32px;
+        height: 32px;
+    }
+}
+
+// Status Badges
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: $spacing-1 $spacing-2;
+    font-size: $text-xs;
+    font-weight: $font-medium;
+    border-radius: $radius-sm;
+
+    &.badge-success {
+        background: $success-100;
+        color: $success-600;
+    }
+
+    &.badge-danger {
+        background: $danger-100;
+        color: $danger-600;
+    }
+
+    &.badge-warning {
+        background: $warning-100;
+        color: $warning-600;
+    }
+
+    &.badge-neutral {
+        background: $slate-100;
+        color: $slate-600;
+    }
+}
+
+// Forms
+.form-group {
+    margin-bottom: $spacing-4;
+
+    label {
+        display: block;
+        font-size: $text-sm;
+        font-weight: $font-medium;
+        color: $slate-700;
+        margin-bottom: $spacing-1;
+    }
+}
+
+.form-input,
+.form-select {
+    width: 100%;
+    padding: $spacing-2 $spacing-3;
+    font-size: $text-sm;
+    border: 1px solid $slate-300;
+    border-radius: $radius-md;
+    background: white;
+    transition: border-color $transition-fast, box-shadow $transition-fast;
+
+    &:focus {
+        outline: none;
+        border-color: $primary-500;
+        box-shadow: 0 0 0 3px $primary-100;
+    }
+
+    &::placeholder {
+        color: $slate-400;
+    }
+}
+
+.form-select {
+    cursor: pointer;
+}
+
+// Modal
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: $z-modal-backdrop;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-4;
+}
+
+.modal {
+    background: white;
+    border-radius: $radius-xl;
+    box-shadow: $shadow-lg;
+    width: 100%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: auto;
+    z-index: $z-modal;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: $spacing-4 $spacing-6;
+    border-bottom: 1px solid $slate-200;
+
+    h2 {
+        font-size: $text-lg;
+        font-weight: $font-semibold;
+        color: $slate-900;
+    }
+}
+
+.modal-body {
+    padding: $spacing-6;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: $spacing-3;
+    padding: $spacing-4 $spacing-6;
+    border-top: 1px solid $slate-200;
+    background: $slate-50;
+}
+
+// Password Display
+.password-display {
+    display: flex;
+    align-items: center;
+    gap: $spacing-2;
+    font-family: monospace;
+    font-size: $text-sm;
+    background: $slate-100;
+    padding: $spacing-1 $spacing-2;
+    border-radius: $radius-sm;
+
+    .password-text {
+        letter-spacing: 0.05em;
+    }
+
+    .password-hidden {
+        color: $slate-400;
+    }
+
+    button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: $slate-500;
+        padding: 2px;
+
+        &:hover {
+            color: $slate-700;
+        }
+    }
+}
+
+// Actions Column
+.actions-cell {
+    display: flex;
+    gap: $spacing-2;
+}
+
+// Empty State
+.empty-state {
+    text-align: center;
+    padding: $spacing-8;
+    color: $slate-500;
+
+    svg {
+        width: 48px;
+        height: 48px;
+        margin-bottom: $spacing-4;
+        opacity: 0.5;
+    }
+
+    p {
+        font-size: $text-sm;
+    }
+}
+
+// Loading
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-8;
+    color: $slate-500;
+}
+
+// Utilities
+.text-muted {
+    color: $slate-500;
+}
+
+.text-success {
+    color: $success-600;
+}
+
+.text-danger {
+    color: $danger-600;
+}
+
+.font-mono {
+    font-family: monospace;
+}
+
+.flex {
+    display: flex;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.gap-2 {
+    gap: $spacing-2;
+}
+
+.mt-4 {
+    margin-top: $spacing-4;
+}
+
+.mb-4 {
+    margin-bottom: $spacing-4;
+}
