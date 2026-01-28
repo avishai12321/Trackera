@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
 import DashboardLayout from '../../components/DashboardLayout';
 import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -17,7 +16,6 @@ interface ImportResult {
 
 export default function Import() {
     const router = useRouter();
-    const t = useTranslations('import');
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<ImportResult | null>(null);
@@ -55,7 +53,12 @@ export default function Import() {
     };
 
     const handleUpload = async () => {
-        if (!file) return;
+        if (!file) {
+            console.error('No file selected');
+            return;
+        }
+
+        console.log('File to upload:', file.name, file.size, 'bytes', file.type);
 
         setLoading(true);
         setError('');
@@ -75,12 +78,19 @@ export default function Import() {
 
             const formData = new FormData();
             formData.append('file', file);
+            console.log('FormData created, file appended');
+            console.log('FormData entries:', Array.from(formData.entries()).map(([key, value]) => ({
+                key,
+                value: value instanceof File ? `File: ${value.name} (${value.size} bytes)` : value
+            })));
 
+            // IMPORTANT: Do NOT set Content-Type header - let browser set it automatically with boundary
             const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api'}/import/excel`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${session.access_token}`,
                     'x-tenant-id': tenantId,
+                    // Content-Type is automatically set by browser for FormData
                 },
                 body: formData,
             });
@@ -107,10 +117,10 @@ export default function Import() {
         <DashboardLayout>
             <div style={{ padding: '24px', maxWidth: '900px', margin: '0 auto' }}>
                 <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px', color: '#1e293b' }}>
-                    {t('title')}
+                    Import Data from Excel
                 </h1>
                 <p style={{ color: '#64748b', marginBottom: '32px' }}>
-                    {t('subtitle')}
+                    Upload an Excel file with employees, customers, projects, and time entries to bulk import data.
                 </p>
 
                 {/* File Upload Section */}
@@ -141,17 +151,17 @@ export default function Import() {
                             <FileSpreadsheet size={56} style={{ margin: '0 auto 16px', color: '#22c55e' }} />
                             <p style={{ fontWeight: 600, color: '#22c55e', fontSize: '18px' }}>{file.name}</p>
                             <p style={{ fontSize: '14px', color: '#64748b', marginTop: '8px' }}>
-                                {(file.size / 1024).toFixed(1)} KB - {t('clickToChange')}
+                                {(file.size / 1024).toFixed(1)} KB - Click to change file
                             </p>
                         </>
                     ) : (
                         <>
                             <Upload size={56} style={{ margin: '0 auto 16px', color: '#94a3b8' }} />
                             <p style={{ fontWeight: 600, color: '#334155', fontSize: '18px' }}>
-                                {t('dragDrop')}
+                                Drop your Excel file here
                             </p>
                             <p style={{ fontSize: '14px', color: '#64748b', marginTop: '8px' }}>
-                                {t('clickToBrowse')}
+                                or click to browse
                             </p>
                         </>
                     )}
@@ -165,34 +175,35 @@ export default function Import() {
                     marginBottom: '24px',
                 }}>
                     <h3 style={{ fontWeight: 600, marginBottom: '12px', color: '#334155' }}>
-                        {t('expectedFormat')}
+                        Expected Excel Format
                     </h3>
                     <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '12px' }}>
-                        {t('expectedDescription')}
+                        Your Excel file should have 4 sheets with the following columns:
                     </p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                         <div style={{ background: 'white', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <strong style={{ color: '#6366f1' }}>{t('sheetEmployees')}</strong>
+                            <strong style={{ color: '#6366f1' }}>Sheet 1: employees</strong>
                             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                                {t('employeeCols')}
+                                name, first_report_date, last_report_date
                             </p>
                         </div>
                         <div style={{ background: 'white', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <strong style={{ color: '#6366f1' }}>{t('sheetCustomers')}</strong>
+                            <strong style={{ color: '#6366f1' }}>Sheet 2: customers</strong>
                             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                                {t('customerCols')}
+                                name (customer name)
                             </p>
                         </div>
                         <div style={{ background: 'white', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <strong style={{ color: '#6366f1' }}>{t('sheetProjects')}</strong>
+                            <strong style={{ color: '#6366f1' }}>Sheet 3: projects</strong>
                             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                                {t('projectCols')}
+                                customer, project, project_key
                             </p>
                         </div>
                         <div style={{ background: 'white', padding: '12px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                            <strong style={{ color: '#6366f1' }}>{t('sheetTimeEntries')}</strong>
+                            <strong style={{ color: '#6366f1' }}>Sheet 4: time_entries</strong>
                             <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                                {t('timeEntryCols')}
+                                date, employee, project_key, hours, minutes<br/>
+                                <em>Optional:</em> start_time, end_time, description, billable
                             </p>
                         </div>
                     </div>
@@ -222,12 +233,12 @@ export default function Import() {
                     {loading ? (
                         <>
                             <Loader2 size={22} style={{ animation: 'spin 1s linear infinite' }} />
-                            {t('importing')}
+                            Importing data...
                         </>
                     ) : (
                         <>
                             <Upload size={22} />
-                            {t('importData')}
+                            Import Data
                         </>
                     )}
                 </button>
@@ -247,7 +258,7 @@ export default function Import() {
                     }}>
                         <AlertCircle size={22} style={{ flexShrink: 0, marginTop: '2px' }} />
                         <div>
-                            <strong>{t('importError')}</strong>
+                            <strong>Import Error</strong>
                             <p style={{ marginTop: '4px', fontSize: '14px' }}>{error}</p>
                         </div>
                     </div>
@@ -267,9 +278,9 @@ export default function Import() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                                 <CheckCircle size={28} style={{ color: '#22c55e' }} />
                                 <div>
-                                    <strong style={{ fontSize: '18px', color: '#166534' }}>{t('importSuccess')}</strong>
+                                    <strong style={{ fontSize: '18px', color: '#166534' }}>Import Completed!</strong>
                                     <p style={{ color: '#15803d', fontSize: '14px' }}>
-                                        {totalCreated} {t('recordsCreated')}
+                                        {totalCreated} records created successfully
                                     </p>
                                 </div>
                             </div>
@@ -354,7 +365,7 @@ export default function Import() {
                                     fontWeight: 500,
                                 }}
                             >
-                                {t('viewEmployees')}
+                                View Employees
                             </button>
                             <button
                                 onClick={() => router.push('/clients')}
@@ -368,7 +379,7 @@ export default function Import() {
                                     fontWeight: 500,
                                 }}
                             >
-                                {t('viewClients')}
+                                View Clients
                             </button>
                             <button
                                 onClick={() => router.push('/projects')}
@@ -382,7 +393,7 @@ export default function Import() {
                                     fontWeight: 500,
                                 }}
                             >
-                                {t('viewProjects')}
+                                View Projects
                             </button>
                         </div>
                     </div>
